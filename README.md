@@ -28,6 +28,20 @@ npm run lint
 npm test
 ```
 
+## Packaging
+
+Before building an installable VSIX, compile the extension and inspect the
+package payload:
+
+```sh
+npm run compile
+npm pack --dry-run
+```
+
+The installable payload should contain the compiled `out/` runtime, manifest,
+license, README, and resources. It should not include local tickets, OpenSpec
+artifacts, source tests, `.vscode/`, or agent metadata.
+
 ## Manual MVP Smoke Test
 
 1. Open this repository in VS Code.
@@ -47,6 +61,39 @@ npm test
 The current MVP smoke evidence was captured against this repo's `.tickets/`
 tree in the Extension Development Host. Closing a visible child ticket removed
 it from the default tree after save, confirming the watcher refresh path.
+
+## Project Discovery And Switching
+
+vscode-tk can discover more than one `wedow/ticket` project when a VS Code
+workspace contains multiple folders or nested repos. The extension keeps ticket
+identity scoped to the active project root so duplicate ticket ids in different
+repos are not merged.
+
+Discovery order:
+
+1. `vscode-tk.projectRoot`, when explicitly configured.
+2. A workspace folder's local `.tickets/` directory.
+3. The nearest ancestor `.tickets/` directory when the workspace folder has no
+   local ticket project.
+
+When more than one project is discovered and `vscode-tk.projectRoot` is unset,
+use **Tickets: Switch Ticket Project** from the command palette or the Tickets
+view title menu. The selected project is stored in VS Code workspace state, so
+it does not write `.vscode/settings.json` for you.
+
+Set `vscode-tk.projectRoot` only when you want an explicit user/workspace
+override. While that setting is present, UI project switching is disabled so the
+configured project stays authoritative.
+
+By default, an explicit `vscode-tk.projectRoot` must be inside the opened
+workspace. Set `vscode-tk.allowExternalProjectRoot` only when you intentionally
+want the extension to read, watch, open, reveal, and eventually mutate a ticket
+project outside the workspace.
+
+The ticket indexer is bounded to protect the extension host from unusually large
+or noisy repositories. By default it indexes up to 2,000 Markdown ticket files
+and skips individual ticket files larger than 1 MB, surfacing skipped files in
+the Warnings group.
 
 ## Post-MVP Direction
 

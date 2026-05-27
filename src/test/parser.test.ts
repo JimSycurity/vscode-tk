@@ -56,3 +56,15 @@ test("returns parse warnings for malformed frontmatter", () => {
   assert.equal(result.warning.kind, "parse");
   assert.match(result.warning.message, /Invalid frontmatter line/);
 });
+
+test("requires a standalone closing frontmatter delimiter", () => {
+  const result = parseTicketContent(`---
+id: vt-bad
+---not-a-delimiter
+status: open
+---
+# Bad delimiter
+`, { ...options, filePath: "/repo/.tickets/vt-bad-delimiter.md" });
+  assert.equal(result.ok, false);
+  assert.match(result.warning.message, /Invalid frontmatter line/);
+});

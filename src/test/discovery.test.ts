@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { discoverTicketProject } from "../tickets/discovery";
+import { discoverTicketProject, discoverTicketProjects } from "../tickets/discovery";
 
 function tempRepo(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vscode-tk-"));
@@ -17,10 +17,35 @@ test("uses explicit project root setting when provided", () => {
   const repo = tempRepo();
   mkdir(path.join(repo, ".tickets"));
 
-  const result = discoverTicketProject([], repo);
+  const result = discoverTicketProject([repo], repo);
   assert.equal(result.kind, "active");
   assert.equal(result.project.projectRoot, repo);
   assert.equal(result.project.source, "setting");
+  assert.equal(result.project.isExternal, false);
+});
+
+test("blocks explicit external project root by default", () => {
+  const workspace = tempRepo();
+  const external = tempRepo();
+  mkdir(path.join(workspace, ".tickets"));
+  mkdir(path.join(external, ".tickets"));
+
+  const result = discoverTicketProject([workspace], external);
+  assert.equal(result.kind, "blockedExternal");
+  assert.equal(result.project.projectRoot, external);
+  assert.equal(result.project.isExternal, true);
+});
+
+test("allows explicit external project root when opted in", () => {
+  const workspace = tempRepo();
+  const external = tempRepo();
+  mkdir(path.join(workspace, ".tickets"));
+  mkdir(path.join(external, ".tickets"));
+
+  const result = discoverTicketProject([workspace], external, null, true);
+  assert.equal(result.kind, "active");
+  assert.equal(result.project.projectRoot, external);
+  assert.equal(result.project.isExternal, true);
 });
 
 test("uses workspace-local tickets before ancestor tickets", () => {
@@ -56,6 +81,38 @@ test("reports ambiguity for multiple workspace projects", () => {
   const result = discoverTicketProject([first, second]);
   assert.equal(result.kind, "ambiguous");
   assert.equal(result.candidates.length, 2);
+});
+
+test("lists discovered ticket projects without merging identity spaces", () => {
+  const first = tempRepo();
+  const second = tempRepo();
+  mkdir(path.join(first, ".tickets"));
+  mkdir(path.join(second, ".tickets"));
+
+  const projects = discoverTicketProjects([first, second]);
+  assert.deepEqual(projects.map((project) => project.projectRoot), [first, second]);
+});
+
+test("uses selected project root when it matches a discovered project", () => {
+  const first = tempRepo();
+  const second = tempRepo();
+  mkdir(path.join(first, ".tickets"));
+  mkdir(path.join(second, ".tickets"));
+
+  const result = discoverTicketProject([first, second], null, second);
+  assert.equal(result.kind, "active");
+  assert.equal(result.project.projectRoot, second);
+});
+
+test("falls back to ambiguity when selected project root no longer exists in discovery", () => {
+  const first = tempRepo();
+  const second = tempRepo();
+  const missing = tempRepo();
+  mkdir(path.join(first, ".tickets"));
+  mkdir(path.join(second, ".tickets"));
+
+  const result = discoverTicketProject([first, second], null, missing);
+  assert.equal(result.kind, "ambiguous");
 });
 
 test("does not recursively discover descendant ticket projects", () => {

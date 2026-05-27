@@ -1,7 +1,7 @@
 ---
 id: vt-ve0v
 status: open
-deps: []
+deps: [vt-fjw3]
 links: []
 created: 2026-05-27T18:56:28Z
 type: feature

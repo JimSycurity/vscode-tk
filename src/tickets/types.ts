@@ -4,12 +4,14 @@ export interface TicketProject {
   readonly projectRoot: string;
   readonly ticketsDir: string;
   readonly source: DiscoverySource;
+  readonly isExternal: boolean;
 }
 
 export type DiscoveryResult =
   | { readonly kind: "none" }
   | { readonly kind: "active"; readonly project: TicketProject }
-  | { readonly kind: "ambiguous"; readonly candidates: readonly TicketProject[] };
+  | { readonly kind: "ambiguous"; readonly candidates: readonly TicketProject[] }
+  | { readonly kind: "blockedExternal"; readonly project: TicketProject };
 
 export interface TicketRecord {
   readonly id: string;

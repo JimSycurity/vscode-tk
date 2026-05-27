@@ -5,6 +5,14 @@
   "version": "0.0.1",
   "publisher": "jimsycurity",
   "license": "MIT",
+  "files": [
+    "out/extension.js",
+    "out/tickets/*.js",
+    "resources/**",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -14,6 +22,7 @@
   "activationEvents": [
     "onView:vscodeTk.tickets",
     "onCommand:vscode-tk.refresh",
+    "onCommand:vscode-tk.switchProject",
     "onCommand:vscode-tk.search",
     "onCommand:vscode-tk.clearFilters",
     "onCommand:vscode-tk.openTicket",
@@ -45,6 +54,11 @@
       {
         "command": "vscode-tk.refresh",
         "title": "Refresh Tickets",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.switchProject",
+        "title": "Switch Ticket Project",
         "category": "Tickets"
       },
       {
@@ -91,14 +105,19 @@
           "group": "navigation@1"
         },
         {
-          "command": "vscode-tk.search",
+          "command": "vscode-tk.switchProject",
           "when": "view == vscodeTk.tickets",
           "group": "navigation@2"
         },
         {
-          "command": "vscode-tk.clearFilters",
+          "command": "vscode-tk.search",
           "when": "view == vscodeTk.tickets",
           "group": "navigation@3"
+        },
+        {
+          "command": "vscode-tk.clearFilters",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -139,6 +158,11 @@
           ],
           "default": null,
           "description": "Optional path to a wedow/ticket project root or .tickets directory. When unset, vscode-tk discovers the active project from the workspace."
+        },
+        "vscode-tk.allowExternalProjectRoot": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow vscode-tk.projectRoot to point outside the opened workspace. Keep disabled unless you intentionally want vscode-tk to read, watch, open, and future mutation commands to target that external ticket project."
         }
       }
     }

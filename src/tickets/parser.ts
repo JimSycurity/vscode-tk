@@ -79,12 +79,14 @@ function extractFrontmatter(content: string): { ok: true; fields: RawFrontmatter
     return { ok: false, message: "Ticket file must start with YAML frontmatter" };
   }
 
-  const end = normalized.indexOf("\n---", 4);
-  if (end === -1) {
+  const closingDelimiter = /\n---[ \t]*(?:\n|$)/g;
+  closingDelimiter.lastIndex = 4;
+  const closing = closingDelimiter.exec(normalized);
+  if (!closing) {
     return { ok: false, message: "Ticket frontmatter is missing closing delimiter" };
   }
 
-  const raw = normalized.slice(4, end);
+  const raw = normalized.slice(4, closing.index);
   const fields: RawFrontmatter = {};
   for (const [index, line] of raw.split("\n").entries()) {
     if (!line.trim()) {
@@ -99,7 +101,7 @@ function extractFrontmatter(content: string): { ok: true; fields: RawFrontmatter
     fields[match[1]] = match[2].trim();
   }
 
-  return { ok: true, fields, body: normalized.slice(end + "\n---".length) };
+  return { ok: true, fields, body: normalized.slice(closing.index + closing[0].length) };
 }
 
 function scalar(fields: RawFrontmatter, name: string): string {

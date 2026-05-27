@@ -1,0 +1,10 @@
+.codex/**
+.tickets/**
+.vscode/**
+openspec/**
+src/**
+out/test/**
+**/*.map
+tsconfig.json
+package-lock.json
+npm-debug.log*

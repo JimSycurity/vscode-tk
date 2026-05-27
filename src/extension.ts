@@ -1,12 +1,16 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { discoverTicketProject } from "./tickets/discovery";
+import { discoverTicketProject, discoverTicketProjects } from "./tickets/discovery";
 import type { HierarchyGroup, HierarchyTicketNode } from "./tickets/hierarchy";
 import { loadTicketIndex, type TicketIndex } from "./tickets/indexer";
+import { isPathInsideOrEqual } from "./tickets/paths";
 import type { TicketRelationshipMetadata } from "./tickets/relationships";
 import type { TicketProject, TicketRecord, TicketWarning } from "./tickets/types";
 
 type ViewNode = EmptyNode | GroupNode | TicketNode | WarningNode;
+
+const selectedProjectRootKey = "vscode-tk.selectedProjectRoot";
+const watcherRefreshDebounceMs = 150;
 
 interface EmptyNode {
   readonly kind: "empty";
@@ -38,10 +42,10 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<ViewNode | undefined | null | void>();
   private readonly watcherDisposables: vscode.Disposable[] = [];
   private index: TicketIndex | null = null;
-  private loading: Promise<void> | null = null;
+  private loading: Promise<boolean> | null = null;
   private treeView: vscode.TreeView<ViewNode> | null = null;
   private watchedTicketsDir: string | null = null;
-  private selectedTicketId: string | null = null;
+  private selectedTicketIdentity: string | null = null;
   private rootNodes: readonly ViewNode[] = [
     {
       kind: "empty",
@@ -49,6 +53,8 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     }
   ];
   private searchQuery = "";
+  private refreshGeneration = 0;
+  private refreshTimer: NodeJS.Timeout | null = null;
 
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
@@ -60,15 +66,19 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       treeView.onDidChangeSelection((event) => {
         const selected = event.selection[0];
         if (selected?.kind === "ticket") {
-          this.selectedTicketId = selected.ticket.id;
+          this.selectedTicketIdentity = ticketIdentity(selected.ticket);
         }
       })
     );
   }
 
   async refresh(): Promise<void> {
-    this.loading = this.reload();
-    await this.loading;
+    const generation = ++this.refreshGeneration;
+    this.loading = this.reload(generation);
+    const applied = await this.loading;
+    if (!applied) {
+      return;
+    }
     this.onDidChangeTreeDataEmitter.fire();
     await this.revealSelectedTicket();
   }
@@ -93,6 +103,72 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     this.searchQuery = "";
     this.rootNodes = this.createRootNodes();
     this.onDidChangeTreeDataEmitter.fire();
+  }
+
+  async switchProject(): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
+    const configuredProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<string | null>("projectRoot");
+
+    if (configuredProjectRoot?.trim()) {
+      await vscode.window.showInformationMessage("vscode-tk.projectRoot is set; clear that setting to switch projects from the UI.");
+      return;
+    }
+
+    const projects = discoverTicketProjects(folders);
+    if (projects.length === 0) {
+      await vscode.window.showInformationMessage("No .tickets projects were discovered in the current workspace.");
+      return;
+    }
+
+    const selected = await vscode.window.showQuickPick(projects.map((project) => ({
+      label: projectLabel(project),
+      description: project.source,
+      detail: project.projectRoot,
+      project
+    })), {
+      title: "Switch Ticket Project",
+      placeHolder: "Choose the .tickets project to show in the Tickets view"
+    });
+
+    if (!selected) {
+      return;
+    }
+
+    await this.extensionContext.workspaceState.update(selectedProjectRootKey, selected.project.projectRoot);
+    this.searchQuery = "";
+    this.selectedTicketIdentity = null;
+    await this.refresh();
+  }
+
+  async openTicket(item: ViewNode | undefined, options?: vscode.TextDocumentShowOptions): Promise<void> {
+    const ticket = this.indexedTicketFromItem(item);
+    if (!ticket) {
+      await vscode.window.showInformationMessage("Select an indexed ticket to open its Markdown file.");
+      return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(ticket.filePath));
+    await vscode.window.showTextDocument(document, options);
+  }
+
+  async copyTicketId(item: ViewNode | undefined): Promise<void> {
+    const ticket = this.indexedTicketFromItem(item);
+    if (!ticket) {
+      await vscode.window.showInformationMessage("Select an indexed ticket to copy its id.");
+      return;
+    }
+
+    await vscode.env.clipboard.writeText(ticket.id);
+  }
+
+  async revealTicketFile(item: ViewNode | undefined): Promise<void> {
+    const ticket = this.indexedTicketFromItem(item);
+    if (!ticket) {
+      await vscode.window.showInformationMessage("Select an indexed ticket to reveal its file.");
+      return;
+    }
+
+    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(ticket.filePath));
   }
 
   getTreeItem(item: ViewNode): vscode.TreeItem {
@@ -126,13 +202,16 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     return [...this.rootNodes];
   }
 
-  private async reload(): Promise<void> {
+  private async reload(generation: number): Promise<boolean> {
     const folders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
     const configuredProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<string | null>("projectRoot");
-    const discovery = discoverTicketProject(folders, configuredProjectRoot);
+    const allowExternalProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<boolean>("allowExternalProjectRoot") ?? false;
+    const selectedProjectRoot = this.extensionContext.workspaceState.get<string>(selectedProjectRootKey);
+    const discovery = discoverTicketProject(folders, configuredProjectRoot, selectedProjectRoot, allowExternalProjectRoot);
 
     if (discovery.kind === "none") {
       this.index = null;
+      this.updateTreeDescription(null);
       this.updateWatcher(null);
       this.rootNodes = [
         {
@@ -141,26 +220,57 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
           description: folders.length === 0 ? undefined : "Set vscode-tk.projectRoot or open a tk repo"
         }
       ];
-      return;
+      return true;
     }
 
     if (discovery.kind === "ambiguous") {
       this.index = null;
+      this.updateTreeDescription(null);
       this.updateWatcher(null);
       this.rootNodes = [
         {
           kind: "empty",
           label: "Multiple ticket projects found",
-          description: "Set vscode-tk.projectRoot to choose one"
+          description: "Run Switch Ticket Project or set vscode-tk.projectRoot"
         },
         ...discovery.candidates.map((project) => projectNode(project))
       ];
+      return true;
+    }
+
+    if (discovery.kind === "blockedExternal") {
+      this.index = null;
+      this.updateTreeDescription(null);
+      this.updateWatcher(null);
+      this.rootNodes = [
+        {
+          kind: "empty",
+          label: "External ticket project blocked",
+          description: "Enable vscode-tk.allowExternalProjectRoot to use this path"
+        },
+        projectNode(discovery.project)
+      ];
+      return true;
+    }
+
+    const index = await loadTicketIndex(discovery.project);
+    if (generation !== this.refreshGeneration) {
+      return false;
+    }
+
+    this.index = index;
+    this.updateTreeDescription(discovery.project);
+    this.updateWatcher(discovery.project.ticketsDir);
+    this.rootNodes = this.createRootNodes();
+    return true;
+  }
+
+  private updateTreeDescription(project: TicketProject | null): void {
+    if (!this.treeView) {
       return;
     }
 
-    this.index = await loadTicketIndex(discovery.project);
-    this.updateWatcher(discovery.project.ticketsDir);
-    this.rootNodes = this.createRootNodes();
+    this.treeView.description = project ? projectLabel(project) : undefined;
   }
 
   private updateWatcher(ticketsDir: string | null): void {
@@ -168,6 +278,7 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       return;
     }
 
+    this.clearPendingWatcherRefresh();
     for (const disposable of this.watcherDisposables.splice(0)) {
       disposable.dispose();
     }
@@ -179,7 +290,7 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
 
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(ticketsDir, "*.md"));
     const refresh = () => {
-      void this.refresh();
+      this.scheduleWatcherRefresh();
     };
     this.watcherDisposables.push(
       watcher,
@@ -188,6 +299,21 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       watcher.onDidDelete(refresh)
     );
     this.extensionContext.subscriptions.push(watcher);
+  }
+
+  private scheduleWatcherRefresh(): void {
+    this.clearPendingWatcherRefresh();
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      void this.refresh();
+    }, watcherRefreshDebounceMs);
+  }
+
+  private clearPendingWatcherRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   private createRootNodes(): readonly ViewNode[] {
@@ -342,11 +468,11 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
   }
 
   private async revealSelectedTicket(): Promise<void> {
-    if (!this.selectedTicketId || !this.treeView) {
+    if (!this.selectedTicketIdentity || !this.treeView) {
       return;
     }
 
-    const selectedNode = findTicketNode(this.rootNodes, this.selectedTicketId);
+    const selectedNode = findTicketNode(this.rootNodes, this.selectedTicketIdentity);
     if (!selectedNode) {
       return;
     }
@@ -361,33 +487,31 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       // Revealing is best-effort; refresh should still succeed if VS Code cannot reveal.
     }
   }
+
+  private indexedTicketFromItem(item?: ViewNode): TicketRecord | null {
+    if (!this.index || item?.kind !== "ticket") {
+      return null;
+    }
+
+    const node = findTicketNode(this.rootNodes, ticketIdentity(item.ticket));
+    if (!node || !isPathInsideOrEqual(node.ticket.filePath, this.index.project.ticketsDir)) {
+      return null;
+    }
+
+    return node.ticket;
+  }
 }
 
 function projectNode(project: TicketProject): EmptyNode {
   return {
     kind: "empty",
-    label: project.projectRoot,
+    label: projectLabel(project),
     description: project.source
   };
 }
 
-function ticketUriFromItem(item?: ViewNode): vscode.Uri | undefined {
-  return item?.kind === "ticket" ? vscode.Uri.file(item.ticket.filePath) : undefined;
-}
-
-function ticketIdFromItem(item?: ViewNode): string | undefined {
-  return item?.kind === "ticket" ? item.ticket.id : undefined;
-}
-
-async function openTicket(item: ViewNode | undefined, options?: vscode.TextDocumentShowOptions): Promise<void> {
-  const uri = ticketUriFromItem(item);
-  if (!uri) {
-    await vscode.window.showInformationMessage("Select a ticket to open its Markdown file.");
-    return;
-  }
-
-  const document = await vscode.workspace.openTextDocument(uri);
-  await vscode.window.showTextDocument(document, options);
+function projectLabel(project: TicketProject): string {
+  return path.basename(project.projectRoot) || project.projectRoot;
 }
 
 function ticketMatches(ticket: TicketRecord, query: string): boolean {
@@ -406,13 +530,13 @@ function ticketMatches(ticket: TicketRecord, query: string): boolean {
   return haystack.includes(normalized);
 }
 
-function findTicketNode(nodes: readonly ViewNode[], ticketId: string): TicketNode | null {
+function findTicketNode(nodes: readonly ViewNode[], identity: string): TicketNode | null {
   for (const node of nodes) {
-    if (node.kind === "ticket" && node.ticket.id === ticketId) {
+    if (node.kind === "ticket" && ticketIdentity(node.ticket) === identity) {
       return node;
     }
     if ((node.kind === "group" || node.kind === "ticket") && node.children.length > 0) {
-      const child = findTicketNode(node.children, ticketId);
+      const child = findTicketNode(node.children, identity);
       if (child) {
         return child;
       }
@@ -420,6 +544,10 @@ function findTicketNode(nodes: readonly ViewNode[], ticketId: string): TicketNod
   }
 
   return null;
+}
+
+function ticketIdentity(ticket: TicketRecord): string {
+  return `${ticket.projectRoot}::${ticket.id}`;
 }
 
 function ticketDescription(item: TicketNode): string {
@@ -466,29 +594,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     treeView,
     vscode.commands.registerCommand("vscode-tk.refresh", () => ticketsProvider.refresh()),
+    vscode.commands.registerCommand("vscode-tk.switchProject", () => ticketsProvider.switchProject()),
     vscode.commands.registerCommand("vscode-tk.search", () => ticketsProvider.search()),
     vscode.commands.registerCommand("vscode-tk.clearFilters", () => ticketsProvider.clearFilters()),
-    vscode.commands.registerCommand("vscode-tk.openTicket", (item?: ViewNode) => openTicket(item, { preview: true })),
-    vscode.commands.registerCommand("vscode-tk.openTicketPinned", (item?: ViewNode) => openTicket(item, { preview: false })),
-    vscode.commands.registerCommand("vscode-tk.openTicketToSide", (item?: ViewNode) => openTicket(item, { preview: false, viewColumn: vscode.ViewColumn.Beside })),
-    vscode.commands.registerCommand("vscode-tk.copyTicketId", async (item?: ViewNode) => {
-      const ticketId = ticketIdFromItem(item);
-      if (!ticketId) {
-        await vscode.window.showInformationMessage("Select a ticket to copy its id.");
-        return;
-      }
-
-      await vscode.env.clipboard.writeText(ticketId);
-    }),
-    vscode.commands.registerCommand("vscode-tk.revealTicketFile", async (item?: ViewNode) => {
-      const uri = ticketUriFromItem(item);
-      if (!uri) {
-        await vscode.window.showInformationMessage("Select a ticket to reveal its file.");
-        return;
-      }
-
-      await vscode.commands.executeCommand("revealFileInOS", uri);
-    })
+    vscode.commands.registerCommand("vscode-tk.openTicket", (item?: ViewNode) => ticketsProvider.openTicket(item, { preview: true })),
+    vscode.commands.registerCommand("vscode-tk.openTicketPinned", (item?: ViewNode) => ticketsProvider.openTicket(item, { preview: false })),
+    vscode.commands.registerCommand("vscode-tk.openTicketToSide", (item?: ViewNode) => ticketsProvider.openTicket(item, { preview: false, viewColumn: vscode.ViewColumn.Beside })),
+    vscode.commands.registerCommand("vscode-tk.copyTicketId", (item?: ViewNode) => ticketsProvider.copyTicketId(item)),
+    vscode.commands.registerCommand("vscode-tk.revealTicketFile", (item?: ViewNode) => ticketsProvider.revealTicketFile(item))
   );
 }
 
