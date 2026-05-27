@@ -2,62 +2,81 @@
 
 ### Requirement: Parent Child Relationships
 The extension SHALL derive parent and child ticket relationships from the
-`parent` frontmatter field.
+`parent` frontmatter field and make them the primary TreeView structure.
 
 #### Scenario: Ticket has a parent
 - **WHEN** a ticket frontmatter field declares `parent: <id>`
-- **THEN** the extension shows the parent relationship and includes the ticket in
-  the parent's child list
+- **THEN** the extension shows the ticket beneath that parent when the parent is
+  indexed
 
 #### Scenario: Parent ticket is missing
 - **WHEN** a ticket references a parent id that is not present in the active
   project index
-- **THEN** the extension marks the parent reference as unresolved without hiding
-  the ticket
+- **THEN** the extension marks the parent reference as unresolved and displays
+  the ticket under the Unresolved Parent group
 
-### Requirement: Dependency And Blocking Relationships
+### Requirement: Dependency And Blocking Metadata
 The extension SHALL derive dependency and reverse-blocking relationships from
-the `deps` frontmatter field.
+the `deps` frontmatter field and show them as compact metadata in the single MVP
+view.
 
 #### Scenario: Ticket depends on another ticket
 - **WHEN** a ticket declares `deps: [<id>]`
-- **THEN** the extension shows that dependency on the ticket and shows the ticket
-  as blocked by the dependency while the dependency is not closed
+- **THEN** the extension includes the dependency in that ticket's dependency
+  count and identifies unresolved or active blockers when useful
 
 #### Scenario: Ticket blocks another ticket
 - **WHEN** another ticket declares the current ticket id in its `deps` list
-- **THEN** the extension shows the dependent ticket as blocked by the current
-  ticket
+- **THEN** the extension includes the dependent ticket in the current ticket's
+  blocker count
 
-### Requirement: Related Ticket Links
+### Requirement: Related Ticket Link Metadata
 The extension SHALL surface non-blocking related-ticket links from the `links`
-frontmatter field.
+frontmatter field as compact metadata.
 
 #### Scenario: Ticket has related links
 - **WHEN** a ticket declares `links: [<id>]`
-- **THEN** the extension displays those linked tickets separately from blocking
-  dependencies
+- **THEN** the extension includes those linked tickets in the link count without
+  treating them as blockers
 
-### Requirement: Ready And Blocked Classification
-The extension SHALL classify active tickets as ready or blocked based on
-dependency status.
+### Requirement: Relationship Counts
+The extension SHALL include all referenced tickets in dependency, blocker, and
+link counts while distinguishing active or unresolved blockers when useful.
 
-#### Scenario: Active ticket has no unresolved dependencies
-- **WHEN** a ticket is open or in progress and all dependency tickets are closed
-- **THEN** the extension marks the ticket as ready
+#### Scenario: Ticket references closed and active dependencies
+- **WHEN** a ticket has dependencies with mixed statuses
+- **THEN** the extension counts all dependencies and can indicate how many are
+  active or unresolved
 
-#### Scenario: Active ticket has unresolved dependencies
-- **WHEN** a ticket is open or in progress and at least one dependency ticket is
-  missing, open, or in progress
-- **THEN** the extension marks the ticket as blocked and lists the blocking ids
+### Requirement: Status Classification
+The extension SHALL classify known and unknown ticket statuses for display.
+
+#### Scenario: Ticket status is known
+- **WHEN** a ticket status is `open`, `in_progress`, or `closed`
+- **THEN** the extension classifies `open` and `in_progress` as active and
+  `closed` as terminal
+
+#### Scenario: Ticket status is unknown
+- **WHEN** a ticket status is not recognized
+- **THEN** the extension keeps the ticket visible and records an unknown-status
+  warning
+
+### Requirement: Warning Groups
+The extension SHALL show parse and relationship warnings in the Tickets sidebar.
+
+#### Scenario: Parse warning exists
+- **WHEN** a ticket file is malformed or unreadable
+- **THEN** the TreeView includes the warning under a Warnings Parse group
+
+#### Scenario: Relationship warning exists
+- **WHEN** a ticket references a missing parent, dependency, or linked ticket
+- **THEN** the TreeView includes the warning under a Warnings Relationships group
 
 ### Requirement: Relationship Navigation
 The extension SHALL allow users to navigate from visible relationship references
-to the referenced ticket when it is indexed.
+to referenced tickets when the UI exposes those references.
 
-#### Scenario: User activates a relationship reference
-- **WHEN** the user activates a visible parent, child, dependency, blocker, or
+#### Scenario: User activates a visible relationship reference
+- **WHEN** the user activates an indexed parent, child, dependency, blocker, or
   related-ticket reference
-- **THEN** the extension selects that ticket and opens or focuses its Markdown
-  file
-
+- **THEN** the extension opens or focuses that ticket's Markdown file
