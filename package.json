@@ -1,0 +1,158 @@
+{
+  "name": "vscode-tk",
+  "displayName": "vscode-tk",
+  "description": "VS Code extension for wedow/ticket Markdown tickets.",
+  "version": "0.0.1",
+  "publisher": "jimsycurity",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:vscodeTk.tickets",
+    "onCommand:vscode-tk.refresh",
+    "onCommand:vscode-tk.search",
+    "onCommand:vscode-tk.clearFilters",
+    "onCommand:vscode-tk.openTicket",
+    "onCommand:vscode-tk.openTicketPinned",
+    "onCommand:vscode-tk.openTicketToSide",
+    "onCommand:vscode-tk.copyTicketId",
+    "onCommand:vscode-tk.revealTicketFile"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vscodeTk",
+          "title": "Tickets",
+          "icon": "resources/ticket.svg"
+        }
+      ]
+    },
+    "views": {
+      "vscodeTk": [
+        {
+          "id": "vscodeTk.tickets",
+          "name": "Tickets"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vscode-tk.refresh",
+        "title": "Refresh Tickets",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.search",
+        "title": "Search Tickets",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.clearFilters",
+        "title": "Clear Ticket Filters",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.openTicket",
+        "title": "Open Ticket",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.openTicketPinned",
+        "title": "Open Ticket Pinned",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.openTicketToSide",
+        "title": "Open Ticket to Side",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.copyTicketId",
+        "title": "Copy Ticket ID",
+        "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.revealTicketFile",
+        "title": "Reveal Ticket File",
+        "category": "Tickets"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "vscode-tk.refresh",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vscode-tk.search",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@2"
+        },
+        {
+          "command": "vscode-tk.clearFilters",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vscode-tk.openTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vscode-tk.openTicketPinned",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "navigation@2"
+        },
+        {
+          "command": "vscode-tk.openTicketToSide",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "navigation@3"
+        },
+        {
+          "command": "vscode-tk.copyTicketId",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "inline@1"
+        },
+        {
+          "command": "vscode-tk.revealTicketFile",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "vscode-tk",
+      "properties": {
+        "vscode-tk.projectRoot": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "Optional path to a wedow/ticket project root or .tickets directory. When unset, vscode-tk discovers the active project from the workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc --noEmit -p ./",
+    "test": "npm run compile && node --test out/test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
