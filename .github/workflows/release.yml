@@ -1,0 +1,53 @@
+name: Release VSIX
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build Release Artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify VSIX package contents
+        run: npm run package:dry-run
+
+      - name: Build VSIX
+        run: npm run package:vsix
+
+      - name: Generate checksums
+        run: sha256sum *.vsix > SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-tk-vsix
+          path: |
+            *.vsix
+            SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" *.vsix SHA256SUMS.txt --generate-notes --verify-tag
