@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.2
+
+Release hardening and packaging update.
+
+- Add GitHub Actions CI for pushes and pull requests to `main` and `dev`.
+- Add tag-driven GitHub Release workflow that builds the VSIX, writes
+  `SHA256SUMS.txt`, uploads artifacts, and attaches them to the release.
+- Update the VSIX packaging toolchain to `@vscode/vsce` 3.9.1.
+- Harden project discovery so symlinked `.tickets/` directories that escape the
+  project root are treated as external and require
+  `vscode-tk.allowExternalProjectRoot`.
+- Stop running `tk --help` on activation; CLI availability is checked lazily
+  when mutation commands are invoked.
+
 ## 0.0.1
 
 Initial private preview package for vscode-tk.

@@ -1,12 +1,47 @@
 # vscode-tk
 
-A VS Code extension for https://github.com/wedow/ticket.
+A VS Code extension for browsing and managing
+[wedow/ticket](https://github.com/wedow/ticket) Markdown tickets.
 
-## MVP
+## Features
 
-The first implementation is a read-only Tickets sidebar for Markdown-backed
-`tk` tickets. The MVP opens ticket files in the normal VS Code editor and keeps
-`wedow/ticket` files as the source of truth.
+vscode-tk contributes a dedicated **Tickets** activity/sidebar for `.tickets/`
+projects while keeping `wedow/ticket` Markdown files as the source of truth.
+
+- Discover workspace-local and nearest-ancestor `.tickets/` projects.
+- Show every discovered workspace project as a top-level tree node, so
+  duplicate ticket ids in different repos stay isolated.
+- Render parent/child ticket hierarchy with unparented/root tickets under each
+  project.
+- Show priority, status, dependency/blocker/link counts, closed-child counts,
+  and parse/relationship warnings.
+- Search indexed ticket metadata and clear filters from the view toolbar.
+- Open ticket Markdown in the normal VS Code editor, including pinned and
+  side-by-side open commands.
+- Copy ticket ids from ticket context menus.
+- Run optional `tk` CLI-backed mutations for create, add child ticket, start,
+  close, reopen, dependency/link updates, and notes.
+
+The extension does not try to become a second Markdown editor. Ticket text and
+frontmatter stay in the normal `.tickets/*.md` files, and edits made by `tk` or
+another editor are picked up through refresh/file watching.
+
+## Install
+
+Download the latest `.vsix` from the
+[GitHub Releases](https://github.com/JimSycurity/vscode-tk/releases) page.
+
+Install the generated VSIX in VS Code:
+
+1. Open the Extensions view.
+2. Select **Views and More Actions...**.
+3. Choose **Install from VSIX...**.
+4. Select the downloaded file, for example `vscode-tk-0.0.2.vsix`.
+5. Reload VS Code if prompted.
+
+Local/private VSIX installation is the current distribution target. Marketplace
+and Open VSX publishing are deferred until there is more live workspace usage,
+final screenshots, and another security review.
 
 ## Development
 
@@ -18,8 +53,8 @@ npm run compile
 ```
 
 In VS Code, use the **Run Extension** launch configuration. The extension
-contributes a dedicated **Tickets** activity/sidebar and command stubs for the
-read-only MVP workflow.
+contributes the **Tickets** activity/sidebar and command palette entries under
+the **Tickets** category.
 
 Useful checks:
 
@@ -30,13 +65,12 @@ npm test
 
 ## Packaging
 
-Before building an installable VSIX, compile the extension, run tests, and
-inspect the package payload:
+Before building an installable VSIX locally, compile the extension, run tests,
+and inspect the package payload:
 
 ```sh
 npm run compile
 npm test
-npm pack --dry-run
 npm run package:dry-run
 ```
 
@@ -46,13 +80,9 @@ Build an installable VSIX:
 npm run package:vsix
 ```
 
-Install the generated VSIX in VS Code:
-
-1. Open the Extensions view.
-2. Select **Views and More Actions...**.
-3. Choose **Install from VSIX...**.
-4. Select `vscode-tk-0.0.1.vsix`.
-5. Reload VS Code if prompted.
+CI runs on pushes and pull requests to `main` and `dev`. Tagged releases matching
+`v*` run tests, build the VSIX, generate `SHA256SUMS.txt`, upload workflow
+artifacts, and create a GitHub Release.
 
 The installable payload should contain the compiled `out/` runtime, manifest,
 license, README, changelog, release-asset notes, and resources. It should not
@@ -62,17 +92,14 @@ TypeScript, package-lock metadata, or agent metadata.
 Compatibility expectations:
 
 - VS Code `^1.85.0`.
-- Node 18 is supported for local development and packaging in this repo.
+- Node 20 is recommended for local development and packaging because the current
+  `@vscode/vsce` toolchain requires it.
 - Ticket files are Markdown files using `wedow/ticket` frontmatter fields such
   as `id`, `status`, `deps`, `links`, `parent`, `type`, and `priority`.
 - The `tk` CLI is optional for browsing and opening tickets. It is required only
   for mutation commands.
 - Explicit `vscode-tk.projectRoot` values outside the current workspace require
   `vscode-tk.allowExternalProjectRoot`.
-
-Distribution decision: local/private VSIX installation is the current target.
-Marketplace and Open VSX publishing are deferred until more real-workspace smoke
-time, final screenshots, and a fresh security review.
 
 ## Project Discovery And Switching
 
@@ -103,6 +130,11 @@ workspace. Set `vscode-tk.allowExternalProjectRoot` only when you intentionally
 want the extension to read, watch, open, reveal, and eventually mutate a ticket
 project outside the workspace.
 
+Workspace-local `.tickets/` directories are canonicalized during discovery. If
+`.tickets/` is a symlink whose real target escapes the project root, the project
+is treated as external and blocked unless `vscode-tk.allowExternalProjectRoot`
+is enabled.
+
 The ticket indexer is bounded to protect the extension host from unusually large
 or noisy repositories. By default it indexes up to 2,000 Markdown ticket files
 and skips individual ticket files larger than 1 MB, surfacing skipped files in
@@ -127,9 +159,10 @@ Available commands:
 - **Tickets: Unlink Ticket**
 - **Tickets: Add Note**
 
-Commands are available from the command palette and, when `tk` is detected, from
-ticket context menus. If `tk` is unavailable, mutation commands show a diagnostic
-and leave the read-only explorer usable. Successful mutations refresh the tree.
+Commands are available from the command palette and ticket context menus. The
+extension checks for `tk` lazily when a mutation is invoked, not on activation.
+If `tk` is unavailable, mutation commands show a diagnostic and leave the
+read-only explorer usable. Successful mutations refresh the tree.
 
 ## Future Plans
 
