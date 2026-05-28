@@ -5,12 +5,28 @@
   "version": "0.0.1",
   "publisher": "jimsycurity",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/JimSycurity/vscode-tk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JimSycurity/vscode-tk/issues"
+  },
+  "homepage": "https://github.com/JimSycurity/vscode-tk#readme",
+  "keywords": [
+    "tickets",
+    "tk",
+    "wedow-ticket",
+    "issue-tracking"
+  ],
   "files": [
     "out/extension.js",
     "out/tickets/*.js",
     "resources/**",
     "README.md",
-    "LICENSE",
+    "CHANGELOG.md",
+    "docs/release-assets.md",
+    "LICENSE*",
     "package.json"
   ],
   "engines": {
@@ -23,13 +39,24 @@
     "onView:vscodeTk.tickets",
     "onCommand:vscode-tk.refresh",
     "onCommand:vscode-tk.switchProject",
+    "onCommand:vscode-tk.selectProject",
     "onCommand:vscode-tk.search",
     "onCommand:vscode-tk.clearFilters",
     "onCommand:vscode-tk.openTicket",
     "onCommand:vscode-tk.openTicketPinned",
     "onCommand:vscode-tk.openTicketToSide",
     "onCommand:vscode-tk.copyTicketId",
-    "onCommand:vscode-tk.revealTicketFile"
+    "onCommand:vscode-tk.revealTicketFile",
+    "onCommand:vscode-tk.createTicket",
+    "onCommand:vscode-tk.createChildTicket",
+    "onCommand:vscode-tk.startTicket",
+    "onCommand:vscode-tk.closeTicket",
+    "onCommand:vscode-tk.reopenTicket",
+    "onCommand:vscode-tk.addDependency",
+    "onCommand:vscode-tk.removeDependency",
+    "onCommand:vscode-tk.linkTicket",
+    "onCommand:vscode-tk.unlinkTicket",
+    "onCommand:vscode-tk.addNote"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -54,22 +81,32 @@
       {
         "command": "vscode-tk.refresh",
         "title": "Refresh Tickets",
-        "category": "Tickets"
+        "category": "Tickets",
+        "icon": "$(refresh)"
       },
       {
         "command": "vscode-tk.switchProject",
         "title": "Switch Ticket Project",
-        "category": "Tickets"
+        "category": "Tickets",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "vscode-tk.selectProject",
+        "title": "Select Ticket Project",
+        "category": "Tickets",
+        "icon": "$(repo)"
       },
       {
         "command": "vscode-tk.search",
         "title": "Search Tickets",
-        "category": "Tickets"
+        "category": "Tickets",
+        "icon": "$(search)"
       },
       {
         "command": "vscode-tk.clearFilters",
         "title": "Clear Ticket Filters",
-        "category": "Tickets"
+        "category": "Tickets",
+        "icon": "$(clear-all)"
       },
       {
         "command": "vscode-tk.openTicket",
@@ -89,16 +126,82 @@
       {
         "command": "vscode-tk.copyTicketId",
         "title": "Copy Ticket ID",
-        "category": "Tickets"
+        "category": "Tickets",
+        "icon": "$(copy)"
       },
       {
         "command": "vscode-tk.revealTicketFile",
         "title": "Reveal Ticket File",
         "category": "Tickets"
+      },
+      {
+        "command": "vscode-tk.createTicket",
+        "title": "Create Ticket",
+        "category": "Tickets",
+        "icon": "$(add)"
+      },
+      {
+        "command": "vscode-tk.createChildTicket",
+        "title": "Add Child Ticket",
+        "category": "Tickets",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "vscode-tk.startTicket",
+        "title": "Start Ticket",
+        "category": "Tickets",
+        "icon": "$(play)"
+      },
+      {
+        "command": "vscode-tk.closeTicket",
+        "title": "Close Ticket",
+        "category": "Tickets",
+        "icon": "$(check)"
+      },
+      {
+        "command": "vscode-tk.reopenTicket",
+        "title": "Reopen Ticket",
+        "category": "Tickets",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "vscode-tk.addDependency",
+        "title": "Add Dependency",
+        "category": "Tickets",
+        "icon": "$(references)"
+      },
+      {
+        "command": "vscode-tk.removeDependency",
+        "title": "Remove Dependency",
+        "category": "Tickets",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "vscode-tk.linkTicket",
+        "title": "Link Ticket",
+        "category": "Tickets",
+        "icon": "$(link)"
+      },
+      {
+        "command": "vscode-tk.unlinkTicket",
+        "title": "Unlink Ticket",
+        "category": "Tickets",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "vscode-tk.addNote",
+        "title": "Add Note",
+        "category": "Tickets",
+        "icon": "$(note)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "vscode-tk.createTicket",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@0"
+        },
         {
           "command": "vscode-tk.refresh",
           "when": "view == vscodeTk.tickets",
@@ -139,12 +242,57 @@
         {
           "command": "vscode-tk.copyTicketId",
           "when": "view == vscodeTk.tickets && viewItem == ticket",
-          "group": "inline@1"
+          "group": "navigation@4"
         },
         {
-          "command": "vscode-tk.revealTicketFile",
+          "command": "vscode-tk.createChildTicket",
           "when": "view == vscodeTk.tickets && viewItem == ticket",
-          "group": "navigation@4"
+          "group": "mutation@0"
+        },
+        {
+          "command": "vscode-tk.startTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "mutation@1"
+        },
+        {
+          "command": "vscode-tk.closeTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "mutation@2"
+        },
+        {
+          "command": "vscode-tk.reopenTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "mutation@3"
+        },
+        {
+          "command": "vscode-tk.addDependency",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "relationships@1"
+        },
+        {
+          "command": "vscode-tk.removeDependency",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "relationships@2"
+        },
+        {
+          "command": "vscode-tk.linkTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "relationships@3"
+        },
+        {
+          "command": "vscode-tk.unlinkTicket",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "relationships@4"
+        },
+        {
+          "command": "vscode-tk.addNote",
+          "when": "view == vscodeTk.tickets && viewItem == ticket",
+          "group": "mutation@4"
+        },
+        {
+          "command": "vscode-tk.selectProject",
+          "when": "view == vscodeTk.tickets && viewItem == project",
+          "group": "navigation@1"
         }
       ]
     },
@@ -170,13 +318,20 @@
   "scripts": {
     "build": "tsc -p ./",
     "compile": "tsc -p ./",
+    "vscode:prepublish": "npm run compile",
     "watch": "tsc -watch -p ./",
     "lint": "tsc --noEmit -p ./",
-    "test": "npm run compile && node --test out/test/*.test.js"
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "package:dry-run": "vsce ls",
+    "package:vsix": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.32.0",
     "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "cheerio": "1.0.0-rc.12"
   }
 }

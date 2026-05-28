@@ -22,15 +22,26 @@ export function discoverTicketProject(
     return { kind: "active", project };
   }
 
-  const candidates = discoverTicketProjects(workspaceFolders);
+  const discoveredCandidates = discoverTicketProjects(workspaceFolders);
+  const selected = selectedProjectRoot?.trim() ? matchSelectedProject(discoveredCandidates, selectedProjectRoot.trim()) : null;
+  if (selected?.isExternal && !allowExternalProjectRoot) {
+    return { kind: "blockedExternal", project: selected };
+  }
+
+  const blockedExternal = discoveredCandidates.find((candidate) => candidate.isExternal);
+  const candidates = allowExternalProjectRoot
+    ? discoveredCandidates
+    : discoveredCandidates.filter((candidate) => !candidate.isExternal);
   if (selectedProjectRoot?.trim()) {
-    const selected = matchSelectedProject(candidates, selectedProjectRoot.trim());
     if (selected) {
       return { kind: "active", project: selected };
     }
   }
 
   if (candidates.length === 0) {
+    if (blockedExternal && !allowExternalProjectRoot) {
+      return { kind: "blockedExternal", project: blockedExternal };
+    }
     return { kind: "none" };
   }
 
@@ -56,12 +67,7 @@ function projectFromSetting(setting: string, workspaceFolders: readonly string[]
   }
 
   const projectRoot = path.basename(resolved) === ".tickets" ? path.dirname(resolved) : resolved;
-  return {
-    projectRoot,
-    ticketsDir,
-    source: "setting",
-    isExternal: !isPathInAnyWorkspace(projectRoot, workspaceFolders)
-  };
+  return ticketProject(projectRoot, ticketsDir, "setting", workspaceFolders);
 }
 
 function workspaceLocalProject(folder: string): TicketProject[] {
@@ -71,7 +77,7 @@ function workspaceLocalProject(folder: string): TicketProject[] {
     return [];
   }
 
-  return [{ projectRoot, ticketsDir, source: "workspace", isExternal: false }];
+  return [ticketProject(projectRoot, ticketsDir, "workspace", [])];
 }
 
 function ancestorProject(folder: string): TicketProject[] {
@@ -81,7 +87,7 @@ function ancestorProject(folder: string): TicketProject[] {
   while (current !== root) {
     const ticketsDir = path.join(current, ".tickets");
     if (directoryExists(ticketsDir)) {
-      return [{ projectRoot: current, ticketsDir, source: "ancestor", isExternal: false }];
+      return [ticketProject(current, ticketsDir, "ancestor", [])];
     }
     current = path.dirname(current);
   }
@@ -105,9 +111,9 @@ function uniqueProjects(projects: readonly TicketProject[]): TicketProject[] {
 }
 
 function matchSelectedProject(candidates: readonly TicketProject[], selectedProjectRoot: string): TicketProject | null {
-  const resolved = path.resolve(selectedProjectRoot);
+  const resolved = realpathOrResolve(selectedProjectRoot);
   const normalizedRoot = path.basename(resolved) === ".tickets" ? path.dirname(resolved) : resolved;
-  const normalizedTicketsDir = path.basename(resolved) === ".tickets" ? resolved : path.join(resolved, ".tickets");
+  const normalizedTicketsDir = path.basename(resolved) === ".tickets" ? resolved : realpathOrResolve(path.join(resolved, ".tickets"));
 
   return candidates.find((candidate) => candidate.projectRoot === normalizedRoot || candidate.ticketsDir === normalizedTicketsDir) ?? null;
 }
@@ -120,6 +126,26 @@ function directoryExists(dir: string): boolean {
   }
 }
 
+function ticketProject(projectRoot: string, ticketsDir: string, source: TicketProject["source"], workspaceFolders: readonly string[]): TicketProject {
+  const canonicalProjectRoot = realpathOrResolve(projectRoot);
+  const canonicalTicketsDir = realpathOrResolve(ticketsDir);
+  const projectRootIsExternal = source === "setting" && !isPathInAnyWorkspace(canonicalProjectRoot, workspaceFolders);
+  return {
+    projectRoot: canonicalProjectRoot,
+    ticketsDir: canonicalTicketsDir,
+    source,
+    isExternal: projectRootIsExternal || !isPathInsideOrEqual(canonicalTicketsDir, canonicalProjectRoot)
+  };
+}
+
+function realpathOrResolve(candidate: string): string {
+  try {
+    return fs.realpathSync(candidate);
+  } catch {
+    return path.resolve(candidate);
+  }
+}
+
 function isPathInAnyWorkspace(candidate: string, workspaceFolders: readonly string[]): boolean {
-  return workspaceFolders.some((folder) => isPathInsideOrEqual(candidate, path.resolve(folder)));
+  return workspaceFolders.some((folder) => isPathInsideOrEqual(candidate, realpathOrResolve(folder)));
 }

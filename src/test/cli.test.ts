@@ -30,6 +30,19 @@ test("builds fixed argv arrays without shell command assembly", () => {
   assert.deepEqual(args, ["add-note", "vt-demo; rm -rf /", "note && still an argv value"]);
 });
 
+test("builds argv arrays for all supported tk mutations", () => {
+  assert.deepEqual(tkArgsForMutation({ kind: "create", title: "New ticket" }), ["create", "New ticket"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "create", title: "Child ticket", parent: "vt-parent" }), ["create", "Child ticket", "--parent", "vt-parent"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "start", id: "vt-demo" }), ["start", "vt-demo"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "close", id: "vt-demo" }), ["close", "vt-demo"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "reopen", id: "vt-demo" }), ["reopen", "vt-demo"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "addDependency", id: "vt-demo", dependencyId: "vt-dep" }), ["dep", "vt-demo", "vt-dep"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "removeDependency", id: "vt-demo", dependencyId: "vt-dep" }), ["undep", "vt-demo", "vt-dep"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "link", id: "vt-demo", targetIds: ["vt-a", "vt-b"] }), ["link", "vt-demo", "vt-a", "vt-b"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "unlink", id: "vt-demo", targetId: "vt-a" }), ["unlink", "vt-demo", "vt-a"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "addNote", id: "vt-demo", text: "note" }), ["add-note", "vt-demo", "note"]);
+});
+
 test("runs tk mutations with execFile options scoped to the active project", async () => {
   const calls: CapturedExec[] = [];
   const execFileImpl = (

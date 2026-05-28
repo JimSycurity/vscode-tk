@@ -60,6 +60,45 @@ test("uses workspace-local tickets before ancestor tickets", () => {
   assert.equal(result.project.source, "workspace");
 });
 
+test("blocks workspace-local symlinked tickets that escape the project root by default", () => {
+  const repo = tempRepo();
+  const externalTickets = path.join(tempRepo(), ".tickets");
+  mkdir(externalTickets);
+  fs.symlinkSync(externalTickets, path.join(repo, ".tickets"), "dir");
+
+  const result = discoverTicketProject([repo]);
+  assert.equal(result.kind, "blockedExternal");
+  assert.equal(result.project.projectRoot, fs.realpathSync(repo));
+  assert.equal(result.project.ticketsDir, fs.realpathSync(externalTickets));
+  assert.equal(result.project.isExternal, true);
+});
+
+test("allows workspace-local symlinked tickets that escape the project root when opted in", () => {
+  const repo = tempRepo();
+  const externalTickets = path.join(tempRepo(), ".tickets");
+  mkdir(externalTickets);
+  fs.symlinkSync(externalTickets, path.join(repo, ".tickets"), "dir");
+
+  const result = discoverTicketProject([repo], null, null, true);
+  assert.equal(result.kind, "active");
+  assert.equal(result.project.projectRoot, fs.realpathSync(repo));
+  assert.equal(result.project.ticketsDir, fs.realpathSync(externalTickets));
+  assert.equal(result.project.isExternal, true);
+});
+
+test("marks discovered symlinked tickets as external with canonical ticket paths", () => {
+  const repo = tempRepo();
+  const externalTickets = path.join(tempRepo(), ".tickets");
+  mkdir(externalTickets);
+  fs.symlinkSync(externalTickets, path.join(repo, ".tickets"), "dir");
+
+  const projects = discoverTicketProjects([repo]);
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].projectRoot, fs.realpathSync(repo));
+  assert.equal(projects[0].ticketsDir, fs.realpathSync(externalTickets));
+  assert.equal(projects[0].isExternal, true);
+});
+
 test("uses nearest ancestor tickets when workspace has no local tickets", () => {
   const repo = tempRepo();
   const child = path.join(repo, "nested", "child");
