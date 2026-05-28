@@ -1,14 +1,16 @@
 # Release Assets
 
-## Current MVP Screenshots
+## Current Extension Screenshots
 
-Manual smoke testing has captured the MVP in an Extension Development Host with:
+Manual smoke testing has captured the current extension in an Extension
+Development Host with:
 
 - Multiple discovered ticket projects shown as top-level repo nodes.
 - Parent/child ticket hierarchy under a repo node.
 - Ticket metadata, warning groups, and malformed-status warning display.
 - Context menu actions for opening tickets, copying ticket ids, child ticket
   creation, status changes, dependencies, links, and notes.
+- External project-root blocking for workspace-local `.tickets/` symlink escapes.
 
 Before a public Marketplace or Open VSX listing, capture fresh committed images:
 
@@ -18,7 +20,7 @@ Before a public Marketplace or Open VSX listing, capture fresh committed images:
 
 ## Publishing Decision
 
-The current distribution target is local/private VSIX installation. Marketplace
-and Open VSX publishing are intentionally deferred until the extension has a
-little more live workspace usage, final screenshots, and another security review
-after the packaging work lands.
+The current distribution target is versioned GitHub Release VSIX artifacts.
+Marketplace and Open VSX publishing are intentionally deferred until the
+extension has a little more live workspace usage, final screenshots, and another
+security review after more post-release usage.
