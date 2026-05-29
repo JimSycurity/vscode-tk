@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0
+
+Initial release
+- Add support for go-ticket https://github.com/JimSycurity/go-ticket
+
 ## 0.0.2
 
 Release hardening and packaging update.
