@@ -2,7 +2,7 @@
   "name": "vscode-tk",
   "displayName": "vscode-tk",
   "description": "VS Code extension for wedow/ticket Markdown tickets.",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "publisher": "jimsycurity",
   "license": "MIT",
   "repository": {
