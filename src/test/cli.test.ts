@@ -43,7 +43,7 @@ test("builds argv arrays for all supported tk mutations", () => {
   assert.deepEqual(tkArgsForMutation({ kind: "addNote", id: "vt-demo", text: "note" }), ["add-note", "vt-demo", "note"]);
 });
 
-test("runs tk mutations with execFile options scoped to the active project", async () => {
+test("runs configured CLI mutations with execFile options scoped to the active project", async () => {
   const calls: CapturedExec[] = [];
   const execFileImpl = (
     file: string,
@@ -57,7 +57,7 @@ test("runs tk mutations with execFile options scoped to the active project", asy
 
   const result = await runTkMutation({ kind: "close", id: "vt-demo" }, {
     project: project(),
-    command: "tk",
+    command: "gtk",
     env: { PATH: "/bin", SECRET_TOKEN: "nope" },
     execFileImpl
   });
@@ -66,7 +66,7 @@ test("runs tk mutations with execFile options scoped to the active project", asy
   assert.equal(calls.length, 1);
   const observed = calls[0];
   assert.deepEqual(observed.args, ["close", "vt-demo"]);
-  assert.equal(observed.file, "tk");
+  assert.equal(observed.file, "gtk");
   assert.equal(observed.options.cwd, "/repo");
   assert.equal(observed.options.shell, false);
   assert.equal(observed.options.env?.TICKETS_DIR, "/repo/.tickets");

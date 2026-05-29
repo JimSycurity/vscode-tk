@@ -2,7 +2,7 @@ import { execFile } from "child_process";
 import type { ExecFileException, ExecFileOptions } from "child_process";
 import type { TicketProject } from "./types";
 
-const defaultTkCommand = "tk";
+export const defaultTkCommand = "tk";
 const defaultTimeoutMs = 5_000;
 const defaultMaxBuffer = 64 * 1024;
 
@@ -66,7 +66,7 @@ export function checkTkCli(command = defaultTkCommand): Promise<TkCliDiagnostic>
         resolve({
           available: false,
           command,
-          message: "`tk` CLI is not available; read-only ticket browsing can continue."
+          message: `Ticket CLI '${command}' is not available; read-only ticket browsing can continue.`
         });
         return;
       }
@@ -74,7 +74,7 @@ export function checkTkCli(command = defaultTkCommand): Promise<TkCliDiagnostic>
       resolve({
         available: true,
         command,
-        message: "`tk` CLI is available."
+        message: `Ticket CLI '${command}' is available.`
       });
     });
   });
@@ -141,7 +141,7 @@ export function runTkArgs(args: readonly string[], options: TkRunOptions): Promi
       resolve({
         ok: false,
         reason: error.code === "ENOENT" ? "unavailable" : "failed",
-        message: error.code === "ENOENT" ? "`tk` CLI is not available." : `tk command failed: ${error.message}`,
+        message: error.code === "ENOENT" ? `Ticket CLI '${command}' is not available.` : `Ticket CLI '${command}' failed: ${error.message}`,
         stdout: stdoutText,
         stderr: stderrText,
         exitCode: error.code ?? undefined

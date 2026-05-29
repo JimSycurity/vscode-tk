@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { checkTkCli, runTkMutation, type TkMutation, type TkRunResult } from "./tickets/cli";
+import { checkTkCli, defaultTkCommand, runTkMutation, type TkMutation, type TkRunResult } from "./tickets/cli";
 import { discoverTicketProject, discoverTicketProjects } from "./tickets/discovery";
 import type { HierarchyGroup, HierarchyTicketNode } from "./tickets/hierarchy";
 import { loadTicketIndex, type TicketIndex } from "./tickets/indexer";
@@ -802,11 +802,12 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
   private async runMutation(mutation: TkMutation, successMessage: string, target?: TicketRecord | TicketProject): Promise<void> {
     const project = this.projectForMutation(target);
     if (!project) {
-      await vscode.window.showInformationMessage("Open a ticket project before running tk commands.");
+      await vscode.window.showInformationMessage("Open a ticket project before running ticket CLI commands.");
       return;
     }
 
-    const diagnostic = await checkTkCli();
+    const command = ticketCliCommand();
+    const diagnostic = await checkTkCli(command);
     await vscode.commands.executeCommand("setContext", "vscodeTk.tkCliAvailable", diagnostic.available);
     if (!diagnostic.available) {
       await vscode.window.showWarningMessage(diagnostic.message);
@@ -816,9 +817,9 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     const allowExternalProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<boolean>("allowExternalProjectRoot") ?? false;
     const result = await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: "Running tk",
+      title: `Running ${command}`,
       cancellable: false
-    }, () => runTkMutation(mutation, { project, allowExternalProjectRoot }));
+    }, () => runTkMutation(mutation, { project, command, allowExternalProjectRoot }));
 
     if (!result.ok) {
       await showTkFailure(result);
@@ -828,6 +829,12 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     await this.refresh();
     await vscode.window.showInformationMessage(successMessage);
   }
+}
+
+function ticketCliCommand(): string {
+  const configured = vscode.workspace.getConfiguration("vscode-tk").get<string>("command");
+  const command = configured?.trim();
+  return command && command.length > 0 ? command : defaultTkCommand;
 }
 
 function projectNode(project: TicketProject, children: readonly ViewNode[]): ProjectNode {
