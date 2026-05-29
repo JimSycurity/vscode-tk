@@ -19,12 +19,12 @@ projects while keeping `wedow/ticket` Markdown files as the source of truth.
 - Open ticket Markdown in the normal VS Code editor, including pinned and
   side-by-side open commands.
 - Copy ticket ids from ticket context menus.
-- Run optional `tk` CLI-backed mutations for create, add child ticket, start,
+- Run optional ticket CLI-backed mutations for create, add child ticket, start,
   close, reopen, dependency/link updates, and notes.
 
 The extension does not try to become a second Markdown editor. Ticket text and
-frontmatter stay in the normal `.tickets/*.md` files, and edits made by `tk` or
-another editor are picked up through refresh/file watching.
+frontmatter stay in the normal `.tickets/*.md` files, and edits made by `tk`,
+`gtk`, or another editor are picked up through refresh/file watching.
 
 ## Install
 
@@ -96,8 +96,11 @@ Compatibility expectations:
   `@vscode/vsce` toolchain requires it.
 - Ticket files are Markdown files using `wedow/ticket` frontmatter fields such
   as `id`, `status`, `deps`, `links`, `parent`, `type`, and `priority`.
-- The `tk` CLI is optional for browsing and opening tickets. It is required only
-  for mutation commands.
+- A ticket CLI is optional for browsing and opening tickets. It is required only
+  for mutation commands. By default vscode-tk runs `tk`; set
+  `vscode-tk.command` to `gtk` when using
+  [`go-ticket`](https://github.com/JimSycurity/go-ticket) side-by-side with
+  upstream `wedow/ticket`.
 - Explicit `vscode-tk.projectRoot` values outside the current workspace require
   `vscode-tk.allowExternalProjectRoot`.
 
@@ -142,8 +145,8 @@ the Warnings group.
 
 ## Mutation Commands
 
-The extension can run optional `tk` CLI-backed mutation commands. Markdown ticket
-files remain the source of truth; vscode-tk does not hand-edit ticket
+The extension can run optional ticket CLI-backed mutation commands. Markdown
+ticket files remain the source of truth; vscode-tk does not hand-edit ticket
 frontmatter.
 
 Available commands:
@@ -160,15 +163,27 @@ Available commands:
 - **Tickets: Add Note**
 
 Commands are available from the command palette and ticket context menus. The
-extension checks for `tk` lazily when a mutation is invoked, not on activation.
-If `tk` is unavailable, mutation commands show a diagnostic and leave the
-read-only explorer usable. Successful mutations refresh the tree.
+extension checks for the configured command lazily when a mutation is invoked,
+not on activation. If the command is unavailable, mutation commands show a
+diagnostic and leave the read-only explorer usable. Successful mutations refresh
+the tree.
+
+### CLI Command Setting
+
+`vscode-tk.command` controls which executable mutation commands run. The default
+is `tk` for compatibility with upstream `wedow/ticket`. Set it to `gtk` to use
+`go-ticket` without replacing upstream `tk` on your PATH.
+
+The setting accepts an executable name or absolute path only. Inline arguments
+are not supported, and vscode-tk runs the command without a shell. The setting is
+machine-scoped so a repository cannot silently replace the mutation executable
+through workspace settings.
 
 ## Future Plans
 
 vscode-tk now covers the working explorer path: multi-project discovery,
 parent/child hierarchy, ticket opening, metadata search, packageable VSIX builds,
-and optional `tk` CLI-backed mutations. Future work should build on that without
+and optional ticket CLI-backed mutations. Future work should build on that without
 turning the extension into a second Markdown editor.
 
 - Dependency-focused navigation for blocker chains, blocked-by relationships,

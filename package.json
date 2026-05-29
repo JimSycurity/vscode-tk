@@ -311,6 +311,12 @@
           "type": "boolean",
           "default": false,
           "description": "Allow vscode-tk.projectRoot to point outside the opened workspace. Keep disabled unless you intentionally want vscode-tk to read, watch, open, and future mutation commands to target that external ticket project."
+        },
+        "vscode-tk.command": {
+          "type": "string",
+          "default": "tk",
+          "scope": "machine",
+          "description": "Ticket CLI executable name or absolute path used for mutation commands. Use 'gtk' for go-ticket side-by-side installs. Arguments are not supported; commands are executed without a shell."
         }
       }
     }
