@@ -4,6 +4,8 @@
 
 Initial release
 - Add support for go-ticket https://github.com/JimSycurity/go-ticket
+- publish spec
+- Update docs
 
 ## 0.0.2
 

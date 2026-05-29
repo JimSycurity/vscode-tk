@@ -3,6 +3,8 @@
 A VS Code extension for browsing and managing
 [wedow/ticket](https://github.com/wedow/ticket) Markdown tickets.
 
+Also designed to work with [go-ticket](https://github.com/JimSycurity/go-ticket).
+
 ## Features
 
 vscode-tk contributes a dedicated **Tickets** activity/sidebar for `.tickets/`
