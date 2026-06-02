@@ -1,4 +1,4 @@
-export type DiscoverySource = "setting" | "workspace" | "ancestor";
+export type DiscoverySource = "setting" | "workspace" | "ancestor" | "ticketRoots";
 
 export interface TicketProject {
   readonly projectRoot: string;

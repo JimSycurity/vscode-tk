@@ -2,7 +2,7 @@
   "name": "vscode-tk",
   "displayName": "vscode-tk",
   "description": "VS Code extension for wedow/ticket Markdown tickets.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "jimsycurity",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,7 @@
     "onView:vscodeTk.tickets",
     "onCommand:vscode-tk.refresh",
     "onCommand:vscode-tk.switchProject",
+    "onCommand:vscode-tk.discoverTicketRoots",
     "onCommand:vscode-tk.selectProject",
     "onCommand:vscode-tk.search",
     "onCommand:vscode-tk.clearFilters",
@@ -89,6 +90,12 @@
         "title": "Switch Ticket Project",
         "category": "Tickets",
         "icon": "$(repo)"
+      },
+      {
+        "command": "vscode-tk.discoverTicketRoots",
+        "title": "Discover Ticket Roots",
+        "category": "Tickets",
+        "icon": "$(search)"
       },
       {
         "command": "vscode-tk.selectProject",
@@ -213,14 +220,19 @@
           "group": "navigation@2"
         },
         {
-          "command": "vscode-tk.search",
+          "command": "vscode-tk.discoverTicketRoots",
           "when": "view == vscodeTk.tickets",
           "group": "navigation@3"
         },
         {
-          "command": "vscode-tk.clearFilters",
+          "command": "vscode-tk.search",
           "when": "view == vscodeTk.tickets",
           "group": "navigation@4"
+        },
+        {
+          "command": "vscode-tk.clearFilters",
+          "when": "view == vscodeTk.tickets",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -306,6 +318,21 @@
           ],
           "default": null,
           "description": "Optional path to a wedow/ticket project root or .tickets directory. When unset, vscode-tk discovers the active project from the workspace."
+        },
+        "vscode-tk.ticketRoots": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Workspace-relative ticket project roots or .tickets directories to load when vscode-tk.projectRoot is unset. Absolute paths and paths that escape the workspace are ignored."
+        },
+        "vscode-tk.discoveryMaxDepth": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Maximum descendant directory depth to scan for workspace ticket projects when vscode-tk.ticketRoots is unset. 0 checks workspace roots only, 1 includes immediate child directories, and 2 includes grandchildren."
         },
         "vscode-tk.allowExternalProjectRoot": {
           "type": "boolean",

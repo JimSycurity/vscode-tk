@@ -1,16 +1,15 @@
 # vscode-tk
 
 A VS Code extension for browsing and managing
-[wedow/ticket](https://github.com/wedow/ticket) Markdown tickets.
-
-Also designed to work with [go-ticket](https://github.com/JimSycurity/go-ticket).
+[wedow/ticket](https://github.com/wedow/ticket) or [go-ticket](https://github.com/JimSycurity/go-ticket) Markdown tickets.
 
 ## Features
 
 vscode-tk contributes a dedicated **Tickets** activity/sidebar for `.tickets/`
-projects while keeping `wedow/ticket` Markdown files as the source of truth.
+projects while keeping `wedow/ticket` or `go-ticket` Markdown files as the source of truth.
 
-- Discover workspace-local and nearest-ancestor `.tickets/` projects.
+- Discover workspace-local, saved workspace-relative, and nearest-ancestor
+  `.tickets/` projects.
 - Show every discovered workspace project as a top-level tree node, so
   duplicate ticket ids in different repos stay isolated.
 - Render parent/child ticket hierarchy with unparented/root tickets under each
@@ -105,6 +104,8 @@ Compatibility expectations:
   upstream `wedow/ticket`.
 - Explicit `vscode-tk.projectRoot` values outside the current workspace require
   `vscode-tk.allowExternalProjectRoot`.
+- Use **Tickets: Discover Ticket Roots** to save workspace-relative ticket roots
+  into `vscode-tk.ticketRoots` for large workspaces such as `~/Repos`.
 
 ## Project Discovery And Switching
 
@@ -117,9 +118,21 @@ ticket ids in different repos are not merged.
 Discovery order:
 
 1. `vscode-tk.projectRoot`, when explicitly configured.
-2. A workspace folder's local `.tickets/` directory.
-3. The nearest ancestor `.tickets/` directory when the workspace folder has no
+2. `vscode-tk.ticketRoots`, when workspace-relative roots have been saved.
+3. Bounded workspace discovery for local `.tickets/` directories.
+4. The nearest ancestor `.tickets/` directory when the workspace folder has no
    local ticket project.
+
+Use **Tickets: Discover Ticket Roots** when opening a broad workspace that
+contains multiple repos, such as `~/Repos`. The command scans only the current
+workspace at the configured bounded depth, ignores noisy directories such as
+`.git`, `node_modules`, `out`, and `target`, does not follow symlinked
+directories, and saves selected roots as workspace-relative paths in
+`vscode-tk.ticketRoots`.
+
+`vscode-tk.discoveryMaxDepth` defaults to `1`: workspace folders and their
+immediate child directories. It is capped at `2` to avoid broad recursive
+walks. Set it to `0` when only workspace-folder roots should be checked.
 
 When more than one project is discovered and `vscode-tk.projectRoot` is unset,
 the Tickets view lists all discovered workspace/ancestor projects. **Tickets:
@@ -134,6 +147,10 @@ By default, an explicit `vscode-tk.projectRoot` must be inside the opened
 workspace. Set `vscode-tk.allowExternalProjectRoot` only when you intentionally
 want the extension to read, watch, open, reveal, and eventually mutate a ticket
 project outside the workspace.
+
+Saved `vscode-tk.ticketRoots` entries are stricter than `projectRoot`: they must
+be relative to an opened workspace folder. Absolute paths and paths that escape
+the workspace are ignored rather than treated as external roots.
 
 Workspace-local `.tickets/` directories are canonicalized during discovery. If
 `.tickets/` is a symlink whose real target escapes the project root, the project

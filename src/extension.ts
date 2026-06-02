@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { checkTkCli, defaultTkCommand, runTkMutation, type TkMutation, type TkRunResult } from "./tickets/cli";
-import { discoverTicketProject, discoverTicketProjects } from "./tickets/discovery";
+import { discoverTicketProject, discoverTicketProjects, discoverWorkspaceTicketProjects } from "./tickets/discovery";
 import type { HierarchyGroup, HierarchyTicketNode } from "./tickets/hierarchy";
 import { loadTicketIndex, type TicketIndex } from "./tickets/indexer";
 import { isPathInsideOrEqual } from "./tickets/paths";
@@ -47,6 +47,10 @@ interface ProjectNode {
 
 interface TicketPickItem extends vscode.QuickPickItem {
   readonly ticketId: string;
+}
+
+interface TicketRootPickItem extends vscode.QuickPickItem {
+  readonly root: string;
 }
 
 class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
@@ -126,7 +130,7 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       return;
     }
 
-    const discoveredProjects = discoverTicketProjects(folders);
+    const discoveredProjects = discoverTicketProjects(folders, this.configuredTicketRoots(), this.discoveryMaxDepth());
     const projects = allowExternalProjectRoot
       ? discoveredProjects
       : discoveredProjects.filter((project) => !project.isExternal);
@@ -154,6 +158,66 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     }
 
     await this.revealProject(selected.project);
+  }
+
+  async discoverTicketRoots(): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
+    if (folders.length === 0) {
+      await vscode.window.showInformationMessage("Open a workspace before discovering ticket roots.");
+      return;
+    }
+
+    const discoveredProjects = discoverWorkspaceTicketProjects(folders, this.discoveryMaxDepth());
+    const projects = discoveredProjects.filter((project) => !project.isExternal);
+    if (projects.length === 0) {
+      if (discoveredProjects.some((project) => project.isExternal)) {
+        await vscode.window.showInformationMessage("Only external or symlink-escaped .tickets projects were discovered, so no workspace ticket roots were saved.");
+        return;
+      }
+      await vscode.window.showInformationMessage("No workspace .tickets projects were discovered.");
+      return;
+    }
+
+    const existingRoots = new Set(this.configuredTicketRoots());
+    const items = projects
+      .flatMap((project) => {
+        const root = workspaceRelativeTicketRoot(project, folders);
+        return root
+          ? [{
+              label: projectLabel(project),
+              description: root,
+              detail: project.projectRoot,
+              picked: existingRoots.has(root),
+              root
+            }]
+          : [];
+      })
+      .sort((left, right) => left.root.localeCompare(right.root));
+
+    if (items.length === 0) {
+      await vscode.window.showInformationMessage("No workspace-relative ticket roots were safe to save.");
+      return;
+    }
+
+    const selected = await vscode.window.showQuickPick<TicketRootPickItem>(items, {
+      title: "Discover Ticket Roots",
+      placeHolder: "Select ticket roots to save in this workspace",
+      canPickMany: true,
+      matchOnDescription: true,
+      matchOnDetail: true
+    });
+
+    if (!selected) {
+      return;
+    }
+
+    const roots = [...new Set(selected.map((item) => item.root))].sort();
+    await vscode.workspace.getConfiguration("vscode-tk").update("ticketRoots", roots, vscode.ConfigurationTarget.Workspace);
+    await this.extensionContext.workspaceState.update(selectedProjectRootKey, null);
+    await this.refresh();
+
+    const noun = roots.length === 1 ? "ticket root" : "ticket roots";
+    await vscode.window.showInformationMessage(`Saved ${roots.length} ${noun} to vscode-tk.ticketRoots.`);
   }
 
   async selectProjectFromNode(item?: ViewNode): Promise<void> {
@@ -356,7 +420,7 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     const folders = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [];
     const configuredProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<string | null>("projectRoot");
     const allowExternalProjectRoot = vscode.workspace.getConfiguration("vscode-tk").get<boolean>("allowExternalProjectRoot") ?? false;
-    const discovery = discoverTicketProject(folders, configuredProjectRoot, null, allowExternalProjectRoot);
+    const discovery = discoverTicketProject(folders, configuredProjectRoot, null, allowExternalProjectRoot, this.configuredTicketRoots(), this.discoveryMaxDepth());
 
     if (discovery.kind === "none") {
       this.indexes = [];
@@ -418,6 +482,20 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     }
 
     this.treeView.description = project ? projectLabel(project) : undefined;
+  }
+
+  private configuredTicketRoots(): readonly string[] {
+    const configured = vscode.workspace.getConfiguration("vscode-tk").get<readonly string[]>("ticketRoots") ?? [];
+    return configured.filter((value) => typeof value === "string" && value.trim().length > 0);
+  }
+
+  private discoveryMaxDepth(): number {
+    const configured = vscode.workspace.getConfiguration("vscode-tk").get<number>("discoveryMaxDepth");
+    if (typeof configured !== "number" || Number.isNaN(configured)) {
+      return 1;
+    }
+
+    return Math.min(Math.max(0, Math.floor(configured)), 2);
   }
 
   private updateWatchers(ticketsDirs: readonly string[]): void {
@@ -849,6 +927,27 @@ function projectLabel(project: TicketProject): string {
   return path.basename(project.projectRoot) || project.projectRoot;
 }
 
+function workspaceRelativeTicketRoot(project: TicketProject, workspaceFolders: readonly string[]): string | null {
+  for (const folder of workspaceFolders) {
+    if (!isPathInsideOrEqual(project.ticketsDir, folder)) {
+      continue;
+    }
+
+    const relative = path.relative(folder, project.ticketsDir);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      continue;
+    }
+
+    return normalizeWorkspaceSettingPath(relative);
+  }
+
+  return null;
+}
+
+function normalizeWorkspaceSettingPath(value: string): string {
+  return value.split(path.sep).join("/");
+}
+
 function relationshipPickItem(id: string, ticket?: TicketRecord): TicketPickItem {
   return {
     label: ticket ? `${ticket.id} ${ticket.title}` : id,
@@ -981,6 +1080,7 @@ export function activate(context: vscode.ExtensionContext): void {
     treeView,
     vscode.commands.registerCommand("vscode-tk.refresh", () => ticketsProvider.refresh()),
     vscode.commands.registerCommand("vscode-tk.switchProject", () => ticketsProvider.switchProject()),
+    vscode.commands.registerCommand("vscode-tk.discoverTicketRoots", () => ticketsProvider.discoverTicketRoots()),
     vscode.commands.registerCommand("vscode-tk.selectProject", (item?: ViewNode) => ticketsProvider.selectProjectFromNode(item)),
     vscode.commands.registerCommand("vscode-tk.search", () => ticketsProvider.search()),
     vscode.commands.registerCommand("vscode-tk.clearFilters", () => ticketsProvider.clearFilters()),

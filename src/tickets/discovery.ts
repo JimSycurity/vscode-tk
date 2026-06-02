@@ -3,11 +3,29 @@ import * as path from "path";
 import { isPathInsideOrEqual } from "./paths";
 import type { DiscoveryResult, TicketProject } from "./types";
 
+const ignoredDiscoveryDirectories = new Set([
+  ".cache",
+  ".git",
+  ".hg",
+  ".svn",
+  ".venv",
+  "build",
+  "dist",
+  "node_modules",
+  "out",
+  "target"
+]);
+const defaultDiscoveryMaxDepth = 1;
+const maxDiscoveryDepth = 2;
+const maxDiscoveryDirectories = 250;
+
 export function discoverTicketProject(
   workspaceFolders: readonly string[],
   projectRootSetting?: string | null,
   selectedProjectRoot?: string | null,
-  allowExternalProjectRoot = false
+  allowExternalProjectRoot = false,
+  ticketRootSettings: readonly string[] = [],
+  discoveryMaxDepth = defaultDiscoveryMaxDepth
 ): DiscoveryResult {
   if (projectRootSetting?.trim()) {
     const project = projectFromSetting(projectRootSetting.trim(), workspaceFolders);
@@ -22,7 +40,7 @@ export function discoverTicketProject(
     return { kind: "active", project };
   }
 
-  const discoveredCandidates = discoverTicketProjects(workspaceFolders);
+  const discoveredCandidates = discoverTicketProjects(workspaceFolders, ticketRootSettings, discoveryMaxDepth);
   const selected = selectedProjectRoot?.trim() ? matchSelectedProject(discoveredCandidates, selectedProjectRoot.trim()) : null;
   if (selected?.isExternal && !allowExternalProjectRoot) {
     return { kind: "blockedExternal", project: selected };
@@ -52,11 +70,29 @@ export function discoverTicketProject(
   return { kind: "ambiguous", candidates };
 }
 
-export function discoverTicketProjects(workspaceFolders: readonly string[]): TicketProject[] {
-  return uniqueProjects(workspaceFolders.flatMap((folder) => {
-    const local = workspaceLocalProject(folder);
-    return local.length > 0 ? local : ancestorProject(folder);
-  }));
+export function discoverTicketProjects(
+  workspaceFolders: readonly string[],
+  ticketRootSettings: readonly string[] = [],
+  discoveryMaxDepth = defaultDiscoveryMaxDepth
+): TicketProject[] {
+  const configured = configuredTicketRootProjects(ticketRootSettings, workspaceFolders);
+  if (configured.length > 0) {
+    return uniqueProjects(configured);
+  }
+
+  const workspaceProjects = discoverWorkspaceTicketProjects(workspaceFolders, discoveryMaxDepth);
+  if (workspaceProjects.length > 0) {
+    return workspaceProjects;
+  }
+
+  return uniqueProjects(workspaceFolders.flatMap((folder) => ancestorProject(folder)));
+}
+
+export function discoverWorkspaceTicketProjects(
+  workspaceFolders: readonly string[],
+  discoveryMaxDepth = defaultDiscoveryMaxDepth
+): TicketProject[] {
+  return uniqueProjects(workspaceFolders.flatMap((folder) => workspaceDescendantProjects(folder, discoveryMaxDepth)));
 }
 
 function projectFromSetting(setting: string, workspaceFolders: readonly string[]): TicketProject | null {
@@ -78,6 +114,89 @@ function workspaceLocalProject(folder: string): TicketProject[] {
   }
 
   return [ticketProject(projectRoot, ticketsDir, "workspace", [])];
+}
+
+function configuredTicketRootProjects(settings: readonly string[], workspaceFolders: readonly string[]): TicketProject[] {
+  return settings.flatMap((setting) => {
+    const value = setting.trim();
+    if (!value || path.isAbsolute(value)) {
+      return [];
+    }
+
+    return workspaceFolders.flatMap((folder) => {
+      const workspaceRoot = realpathOrResolve(folder);
+      const resolved = path.resolve(workspaceRoot, value);
+      if (!isPathInsideOrEqual(resolved, workspaceRoot)) {
+        return [];
+      }
+
+      const ticketsDir = path.basename(resolved) === ".tickets" ? resolved : path.join(resolved, ".tickets");
+      if (!directoryExists(ticketsDir)) {
+        return [];
+      }
+
+      const projectRoot = path.basename(resolved) === ".tickets" ? path.dirname(resolved) : resolved;
+      return [ticketProject(projectRoot, ticketsDir, "ticketRoots", workspaceFolders)];
+    });
+  });
+}
+
+function workspaceDescendantProjects(folder: string, discoveryMaxDepth: number): TicketProject[] {
+  const workspaceRoot = realpathOrResolve(folder);
+  const depthLimit = Math.min(Math.max(0, Math.floor(discoveryMaxDepth)), maxDiscoveryDepth);
+  const projects: TicketProject[] = [];
+  const queue: Array<{ readonly dir: string; readonly depth: number }> = [{ dir: workspaceRoot, depth: 0 }];
+  let visited = 0;
+
+  while (queue.length > 0 && visited < maxDiscoveryDirectories) {
+    const current = queue.shift();
+    if (!current) {
+      break;
+    }
+    visited += 1;
+
+    const local = workspaceLocalProject(current.dir);
+    projects.push(...local);
+
+    if (current.depth >= depthLimit) {
+      continue;
+    }
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || ignoredDiscoveryDirectories.has(entry.name)) {
+        continue;
+      }
+
+      const child = path.join(current.dir, entry.name);
+      if (!isSafeDiscoveryDirectory(child, workspaceRoot)) {
+        continue;
+      }
+
+      queue.push({ dir: child, depth: current.depth + 1 });
+    }
+  }
+
+  return uniqueProjects(projects);
+}
+
+function isSafeDiscoveryDirectory(candidate: string, workspaceRoot: string): boolean {
+  try {
+    const stat = fs.lstatSync(candidate);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  return isPathInsideOrEqual(realpathOrResolve(candidate), workspaceRoot);
 }
 
 function ancestorProject(folder: string): TicketProject[] {

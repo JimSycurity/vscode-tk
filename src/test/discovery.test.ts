@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { discoverTicketProject, discoverTicketProjects } from "../tickets/discovery";
+import { discoverTicketProject, discoverTicketProjects, discoverWorkspaceTicketProjects } from "../tickets/discovery";
 
 function tempRepo(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vscode-tk-"));
@@ -154,10 +154,70 @@ test("falls back to ambiguity when selected project root no longer exists in dis
   assert.equal(result.kind, "ambiguous");
 });
 
-test("does not recursively discover descendant ticket projects", () => {
+test("discovers immediate descendant ticket projects with bounded workspace discovery", () => {
   const repo = tempRepo();
   mkdir(path.join(repo, "nested", ".tickets"));
 
   const result = discoverTicketProject([repo]);
-  assert.equal(result.kind, "none");
+  assert.equal(result.kind, "active");
+  assert.equal(result.project.projectRoot, path.join(repo, "nested"));
+  assert.equal(result.project.source, "workspace");
+});
+
+test("does not discover descendant ticket projects when discovery depth is zero", () => {
+  const repo = tempRepo();
+  mkdir(path.join(repo, "nested", ".tickets"));
+
+  const projects = discoverWorkspaceTicketProjects([repo], 0);
+  assert.deepEqual(projects, []);
+});
+
+test("does not discover ticket projects deeper than the discovery depth cap", () => {
+  const repo = tempRepo();
+  mkdir(path.join(repo, "a", "b", "c", ".tickets"));
+
+  const projects = discoverWorkspaceTicketProjects([repo], 2);
+  assert.deepEqual(projects, []);
+});
+
+test("uses saved workspace-relative ticket roots when configured", () => {
+  const workspace = tempRepo();
+  const first = path.join(workspace, "vscode-tk");
+  const second = path.join(workspace, "go-ticket");
+  mkdir(path.join(first, ".tickets"));
+  mkdir(path.join(second, ".tickets"));
+
+  const projects = discoverTicketProjects([workspace], ["vscode-tk/.tickets", "go-ticket"]);
+  assert.deepEqual(projects.map((project) => project.projectRoot), [first, second]);
+  assert.deepEqual(projects.map((project) => project.source), ["ticketRoots", "ticketRoots"]);
+});
+
+test("ignores saved absolute ticket roots", () => {
+  const workspace = tempRepo();
+  const external = tempRepo();
+  mkdir(path.join(external, ".tickets"));
+
+  const projects = discoverTicketProjects([workspace], [external]);
+  assert.deepEqual(projects, []);
+});
+
+test("ignores saved ticket roots that escape the workspace", () => {
+  const parent = tempRepo();
+  const workspace = path.join(parent, "workspace");
+  const external = path.join(parent, "external");
+  mkdir(workspace);
+  mkdir(path.join(external, ".tickets"));
+
+  const projects = discoverTicketProjects([workspace], ["../external"]);
+  assert.deepEqual(projects, []);
+});
+
+test("does not follow symlinked descendant directories during workspace discovery", () => {
+  const workspace = tempRepo();
+  const external = tempRepo();
+  mkdir(path.join(external, ".tickets"));
+  fs.symlinkSync(external, path.join(workspace, "external-link"), "dir");
+
+  const projects = discoverWorkspaceTicketProjects([workspace], 1);
+  assert.deepEqual(projects, []);
 });
