@@ -675,6 +675,9 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     treeItem.description = ticketDescription(item);
     treeItem.tooltip = ticketTooltip(item);
     treeItem.resourceUri = vscode.Uri.file(item.ticket.filePath);
+    if (item.ticket.status === "blocked") {
+      treeItem.iconPath = new vscode.ThemeIcon("error", new vscode.ThemeColor("testing.iconFailed"));
+    }
     if (item.children.length === 0) {
       treeItem.command = {
         command: "vscode-tk.openTicket",

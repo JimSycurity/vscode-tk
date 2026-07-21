@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+Blocked ticket status support and release dependency maintenance.
+
+- Treat `blocked` as a known ticket status so blocked tickets remain in the
+  main tree instead of appearing as unknown-status warnings.
+- Show blocked tickets with a red failure icon in the Tickets tree.
+- Refresh transitive development dependencies to resolve npm audit findings.
+
 ## 0.1.0
 
 Initial release

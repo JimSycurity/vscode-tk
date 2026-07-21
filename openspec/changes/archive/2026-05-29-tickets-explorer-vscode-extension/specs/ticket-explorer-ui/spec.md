@@ -55,7 +55,7 @@ The extension SHALL sort sibling ticket nodes predictably.
 #### Scenario: Sibling tickets are displayed
 - **WHEN** sibling ticket nodes appear in the TreeView
 - **THEN** they are sorted by priority ascending, status order
-  `in_progress`, `open`, `unknown`, `closed`, then title, then id
+  active, `blocked`, unknown, `closed`, then title, then id
 
 ### Requirement: Minimal MVP Search And Filters
 The extension SHALL support lightweight metadata-focused navigation in the MVP.
