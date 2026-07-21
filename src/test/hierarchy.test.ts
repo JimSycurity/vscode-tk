@@ -29,6 +29,7 @@ function ticket(overrides: Partial<TicketRecord> & Pick<TicketRecord, "id" | "ti
 test("classifies known and unknown statuses", () => {
   assert.equal(classifyStatus("open"), "active");
   assert.equal(classifyStatus("in_progress"), "active");
+  assert.equal(classifyStatus("blocked"), "blocked");
   assert.equal(classifyStatus("closed"), "closed");
   assert.equal(classifyStatus("parked"), "unknown");
 });
@@ -89,17 +90,29 @@ test("keeps unknown statuses visible with warnings", () => {
   assert.match(hierarchy.warnings[0].message, /Unknown ticket status/);
 });
 
+test("keeps blocked tickets visible without unknown status warnings", () => {
+  const hierarchy = buildTicketHierarchy([
+    ticket({ id: "vt-blocked", title: "Blocked", status: "blocked" })
+  ]);
+
+  assert.equal(hierarchy.groups[0].children[0].ticket.id, "vt-blocked");
+  assert.equal(hierarchy.groups[0].children[0].statusKind, "blocked");
+  assert.equal(hierarchy.warnings.length, 0);
+});
+
 test("sorts siblings by priority, status, title, then id", () => {
   const hierarchy = buildTicketHierarchy([
     ticket({ id: "vt-z", title: "Zulu", priority: 2, status: "open" }),
     ticket({ id: "vt-b", title: "Bravo", priority: 1, status: "open" }),
     ticket({ id: "vt-a", title: "Alpha", priority: 1, status: "in_progress" }),
+    ticket({ id: "vt-blocked", title: "Blocked", priority: 1, status: "blocked" }),
     ticket({ id: "vt-u", title: "Unknown", priority: 1, status: "parked" })
   ]);
 
   assert.deepEqual(hierarchy.groups[0].children.map((node) => node.ticket.id), [
     "vt-a",
     "vt-b",
+    "vt-blocked",
     "vt-u",
     "vt-z"
   ]);

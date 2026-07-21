@@ -52,9 +52,9 @@ link counts while distinguishing active or unresolved blockers when useful.
 The extension SHALL classify known and unknown ticket statuses for display.
 
 #### Scenario: Ticket status is known
-- **WHEN** a ticket status is `open`, `in_progress`, or `closed`
+- **WHEN** a ticket status is `open`, `in_progress`, `blocked`, or `closed`
 - **THEN** the extension classifies `open` and `in_progress` as active and
-  `closed` as terminal
+  `blocked` as blocked, and `closed` as terminal
 
 #### Scenario: Ticket status is unknown
 - **WHEN** a ticket status is not recognized

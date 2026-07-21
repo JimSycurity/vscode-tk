@@ -22,8 +22,8 @@
 - [x] 3.3 Group tickets with missing parent references under Unresolved Parent.
 - [x] 3.4 Hide closed children by default while computing closed-child counts for parents.
 - [x] 3.5 Show closed parents only when they have visible active children.
-- [x] 3.6 Classify active statuses as `open` and `in_progress`, terminal status as `closed`, and unknown statuses as visible warnings.
-- [x] 3.7 Sort sibling tickets by priority ascending, status order `in_progress`, `open`, `unknown`, `closed`, title, then id.
+- [x] 3.6 Classify active statuses as `open` and `in_progress`, blocked status as `blocked`, terminal status as `closed`, and unknown statuses as visible warnings.
+- [x] 3.7 Sort sibling tickets by priority ascending, status order active, `blocked`, unknown, `closed`, title, then id.
 - [x] 3.8 Add unit tests for hierarchy, unresolved parents, closed visibility, status classification, sorting, and unknown-status warnings.
 
 ## 4. Relationship Metadata And Warnings

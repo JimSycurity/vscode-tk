@@ -1,6 +1,6 @@
 import type { TicketRecord, TicketWarning } from "./types";
 
-export type TicketStatusKind = "active" | "closed" | "unknown";
+export type TicketStatusKind = "active" | "blocked" | "closed" | "unknown";
 
 export interface HierarchyTicketNode {
   readonly kind: "ticket";
@@ -33,6 +33,8 @@ export function classifyStatus(status: string): TicketStatusKind {
     case "open":
     case "in_progress":
       return "active";
+    case "blocked":
+      return "blocked";
     case "closed":
       return "closed";
     default:
@@ -155,9 +157,11 @@ function statusSortValue(status: TicketStatusKind): number {
   switch (status) {
     case "active":
       return 0;
-    case "unknown":
+    case "blocked":
       return 1;
-    case "closed":
+    case "unknown":
       return 2;
+    case "closed":
+      return 3;
   }
 }
