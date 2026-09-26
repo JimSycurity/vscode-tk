@@ -33,6 +33,7 @@ test("builds fixed argv arrays without shell command assembly", () => {
 test("builds argv arrays for all supported tk mutations", () => {
   assert.deepEqual(tkArgsForMutation({ kind: "create", title: "New ticket" }), ["create", "New ticket"]);
   assert.deepEqual(tkArgsForMutation({ kind: "create", title: "Child ticket", parent: "vt-parent" }), ["create", "Child ticket", "--parent", "vt-parent"]);
+  assert.deepEqual(tkArgsForMutation({ kind: "create", title: "Nested child", parent: "vt-parent", folder: "okta/research" }), ["create", "Nested child", "--parent", "vt-parent", "--folder", "okta/research"]);
   assert.deepEqual(tkArgsForMutation({ kind: "start", id: "vt-demo" }), ["start", "vt-demo"]);
   assert.deepEqual(tkArgsForMutation({ kind: "close", id: "vt-demo" }), ["close", "vt-demo"]);
   assert.deepEqual(tkArgsForMutation({ kind: "reopen", id: "vt-demo" }), ["reopen", "vt-demo"]);

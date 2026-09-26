@@ -10,6 +10,7 @@ import type { TicketProject, TicketRecord, TicketWarning } from "./types";
 
 const defaultMaxTicketFiles = 2_000;
 const defaultMaxTicketFileBytes = 1_000_000;
+const maxScannedDirectories = 2_000;
 
 export interface TicketIndexOptions {
   readonly maxTicketFiles?: number;
@@ -28,15 +29,11 @@ export async function loadTicketIndex(project: TicketProject, options: TicketInd
   const maxTicketFiles = options.maxTicketFiles ?? defaultMaxTicketFiles;
   const maxTicketFileBytes = options.maxTicketFileBytes ?? defaultMaxTicketFileBytes;
   const canonicalTicketsDir = await fs.realpath(project.ticketsDir);
-  const entries = await fs.readdir(project.ticketsDir, { withFileTypes: true });
-  const allTicketFiles = entries
-    .filter((entry) => entry.name.endsWith(".md"))
-    .map((entry) => path.join(project.ticketsDir, entry.name))
-    .sort();
+  const { files: allTicketFiles, warnings: scanWarnings } = await collectTicketFiles(project.ticketsDir, maxTicketFiles);
   const ticketFiles = allTicketFiles.slice(0, maxTicketFiles);
 
   const tickets: TicketRecord[] = [];
-  const parseWarnings: TicketWarning[] = [];
+  const parseWarnings: TicketWarning[] = [...scanWarnings];
 
   for (const filePath of allTicketFiles.slice(maxTicketFiles)) {
     parseWarnings.push(skippedTicketWarning(filePath, `ticket file limit exceeded (${maxTicketFiles})`));
@@ -70,6 +67,53 @@ export async function loadTicketIndex(project: TicketProject, options: TicketInd
     hierarchy,
     relationships
   };
+}
+
+async function collectTicketFiles(ticketsDir: string, maxTicketFiles: number): Promise<{ files: string[]; warnings: TicketWarning[] }> {
+  const files: string[] = [];
+  const warnings: TicketWarning[] = [];
+  let scannedDirectories = 0;
+  let hasDirectoryLimitWarning = false;
+  async function visit(directory: string): Promise<boolean> {
+    scannedDirectories++;
+    let entries;
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if (directory === ticketsDir) {
+        throw error;
+      }
+      warnings.push(skippedTicketWarning(directory, `unable to read directory: ${error instanceof Error ? error.message : String(error)}`));
+      return true;
+    }
+    for (const entry of entries.sort((left, right) => {
+      const leftPath = left.name + (left.isDirectory() ? path.sep : "");
+      const rightPath = right.name + (right.isDirectory() ? path.sep : "");
+      return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : 0;
+    })) {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (scannedDirectories >= maxScannedDirectories) {
+          if (!hasDirectoryLimitWarning) {
+            warnings.push(skippedTicketWarning(entryPath, `directory limit exceeded (${maxScannedDirectories})`));
+            hasDirectoryLimitWarning = true;
+          }
+          continue;
+        }
+        if (!await visit(entryPath)) {
+          return false;
+        }
+      } else if (entry.name.endsWith(".md")) {
+        files.push(entryPath);
+        if (files.length > maxTicketFiles) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  await visit(ticketsDir);
+  return { files, warnings };
 }
 
 function removeDuplicateTickets(tickets: readonly TicketRecord[]): { uniqueTickets: TicketRecord[]; duplicateWarnings: TicketWarning[] } {

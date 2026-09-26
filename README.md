@@ -24,8 +24,10 @@ projects while keeping `wedow/ticket` or `go-ticket` Markdown files as the sourc
   close, reopen, dependency/link updates, and notes.
 
 The extension does not try to become a second Markdown editor. Ticket text and
-frontmatter stay in the normal `.tickets/*.md` files, and edits made by `tk`,
-`gtk`, or another editor are picked up through refresh/file watching.
+frontmatter stay in `.tickets/**/*.md` files (including files directly in
+`.tickets/`), and edits made by `tk`, `gtk`, or another editor are picked up
+through refresh/file watching. With `gtk`, a child of a nested ticket is
+created in the same folder; plain create still uses `.tickets/`.
 
 ## Install
 
