@@ -39,7 +39,7 @@ Install the generated VSIX in VS Code:
 1. Open the Extensions view.
 2. Select **Views and More Actions...**.
 3. Choose **Install from VSIX...**.
-4. Select the downloaded file, for example `vscode-tk-0.0.2.vsix`.
+4. Select the downloaded file, for example `vscode-tk-0.4.0.vsix`.
 5. Reload VS Code if prompted.
 
 Local/private VSIX installation is the current distribution target. Marketplace
@@ -83,9 +83,12 @@ Build an installable VSIX:
 npm run package:vsix
 ```
 
-CI runs on pushes and pull requests to `main` and `dev`. Tagged releases matching
-`v*` run tests, build the VSIX, generate `SHA256SUMS.txt`, upload workflow
-artifacts, and create a GitHub Release.
+CI runs on pushes and pull requests to `main` and `dev`. Merge the release PR to
+`main` before creating and pushing its version tag. A `v*` tag triggers the
+release workflow only when its commit is on `main` and its version matches
+`package.json` and `package-lock.json`. The workflow then runs tests, builds the
+VSIX, generates `SHA256SUMS.txt`, uploads workflow artifacts, and creates a
+GitHub Release.
 
 The installable payload should contain the compiled `out/` runtime, manifest,
 license, README, changelog, release-asset notes, and resources. It should not
