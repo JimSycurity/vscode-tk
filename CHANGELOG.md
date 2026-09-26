@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Index and watch tickets in child folders under `.tickets/` while retaining
+  flat ticket support.
+- With gtk, create a child ticket in its parent's folder.
+- Bound recursive scans and report unreadable child folders.
+
 ## 0.3.0
 
 Blocked ticket status support and release dependency maintenance.

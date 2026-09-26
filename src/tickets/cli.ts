@@ -27,6 +27,7 @@ export type TkMutation =
       readonly assignee?: string;
       readonly externalRef?: string;
       readonly parent?: string;
+      readonly folder?: string;
       readonly tags?: readonly string[];
     }
   | { readonly kind: "start"; readonly id: string }
@@ -162,6 +163,7 @@ function createArgs(mutation: Extract<TkMutation, { readonly kind: "create" }>):
   pushOption(args, "--assignee", mutation.assignee);
   pushOption(args, "--external-ref", mutation.externalRef);
   pushOption(args, "--parent", mutation.parent);
+  pushOption(args, "--folder", mutation.folder);
   if (mutation.tags && mutation.tags.length > 0) {
     pushOption(args, "--tags", mutation.tags.join(","));
   }

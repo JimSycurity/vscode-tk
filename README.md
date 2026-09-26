@@ -24,8 +24,10 @@ projects while keeping `wedow/ticket` or `go-ticket` Markdown files as the sourc
   close, reopen, dependency/link updates, and notes.
 
 The extension does not try to become a second Markdown editor. Ticket text and
-frontmatter stay in the normal `.tickets/*.md` files, and edits made by `tk`,
-`gtk`, or another editor are picked up through refresh/file watching.
+frontmatter stay in `.tickets/**/*.md` files (including files directly in
+`.tickets/`), and edits made by `tk`, `gtk`, or another editor are picked up
+through refresh/file watching. With `gtk`, a child of a nested ticket is
+created in the same folder; plain create still uses `.tickets/`.
 
 ## Install
 
@@ -37,7 +39,7 @@ Install the generated VSIX in VS Code:
 1. Open the Extensions view.
 2. Select **Views and More Actions...**.
 3. Choose **Install from VSIX...**.
-4. Select the downloaded file, for example `vscode-tk-0.0.2.vsix`.
+4. Select the downloaded file, for example `vscode-tk-0.4.0.vsix`.
 5. Reload VS Code if prompted.
 
 Local/private VSIX installation is the current distribution target. Marketplace
@@ -81,9 +83,12 @@ Build an installable VSIX:
 npm run package:vsix
 ```
 
-CI runs on pushes and pull requests to `main` and `dev`. Tagged releases matching
-`v*` run tests, build the VSIX, generate `SHA256SUMS.txt`, upload workflow
-artifacts, and create a GitHub Release.
+CI runs on pushes and pull requests to `main` and `dev`. Merge the release PR to
+`main` before creating and pushing its version tag. A `v*` tag triggers the
+release workflow only when its commit is on `main` and its version matches
+`package.json` and `package-lock.json`. The workflow then runs tests, builds the
+VSIX, generates `SHA256SUMS.txt`, uploads workflow artifacts, and creates a
+GitHub Release.
 
 The installable payload should contain the compiled `out/` runtime, manifest,
 license, README, changelog, release-asset notes, and resources. It should not

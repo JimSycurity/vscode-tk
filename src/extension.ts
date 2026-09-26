@@ -300,7 +300,12 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
       return;
     }
 
-    await this.runMutation({ kind: "create", title: title.trim(), parent: parent.id }, "Child ticket created.", parent);
+    const parentFolder = path.relative(parent.ticketsDir, path.dirname(parent.filePath));
+    // Upstream tk has no --folder option, so inherit the folder only with gtk.
+    const folder = /^gtk(?:\.exe)?$/i.test(path.basename(ticketCliCommand())) && parentFolder
+      ? parentFolder.split(path.sep).join("/")
+      : undefined;
+    await this.runMutation({ kind: "create", title: title.trim(), parent: parent.id, folder }, "Child ticket created.", parent);
   }
 
   async startTicket(item?: ViewNode): Promise<void> {
@@ -511,7 +516,7 @@ class TicketsTreeProvider implements vscode.TreeDataProvider<ViewNode> {
     this.watchedTicketsDirs = nextTicketsDirs;
 
     for (const ticketsDir of ticketsDirs) {
-      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(ticketsDir, "*.md"));
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(ticketsDir, "**/*.md"));
       const refresh = () => {
         this.scheduleWatcherRefresh();
       };
